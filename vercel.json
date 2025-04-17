@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/api/subscribe", "dest": "api/subscribe.js", "methods": ["POST", "OPTIONS"] },
+    { "src": "/api/devotional", "dest": "api/devotional.js", "methods": ["GET"] },
+    { "src": "/api/send-daily", "dest": "api/send-daily.js", "methods": ["GET"] }
+  ]
+}
