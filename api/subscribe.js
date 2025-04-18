@@ -1,30 +1,33 @@
-import admin from '../firebaseAdmin.js';
+import Cors from 'micro-cors'
+import admin from '../firebaseAdmin.js'
 
-export default async function handler(req, res) {
-  // 1) Habilitar CORS para todas las peticiones
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+// Configuramos CORS para POST y OPTIONS
+const cors = Cors({
+  allowMethods: ['POST','OPTIONS']
+})
 
-  // 2) Responder al preflight
+async function handler(req, res) {
+  // Ahora, micro-cors ya habrá añadido los headers
+  // Respondemos al preflight
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return res.status(200).end()
   }
 
-  // 3) Solo aceptamos POST
   if (req.method !== 'POST') {
-    return res.status(405).end('Método no permitido');
+    return res.status(405).end('Método no permitido')
   }
 
-  // 4) Lógica original de guardar la suscripción
-  const subscription = req.body;
+  const subscription = req.body
   try {
-    const db = admin.firestore();
-    const ref = db.collection('pushSubscriptions').doc(subscription.endpoint);
-    await ref.set(subscription, { merge: true });
-    return res.status(200).json({ success: true });
+    const db = admin.firestore()
+    const ref = db.collection('pushSubscriptions').doc(subscription.endpoint)
+    await ref.set(subscription, { merge: true })
+    res.status(200).json({ success: true })
   } catch (error) {
-    console.error('Error al guardar suscripción:', error);
-    return res.status(500).json({ success: false, error: error.message });
+    console.error('Error al guardar suscripción:', error)
+    res.status(500).json({ success: false, error: error.message })
   }
 }
+
+// Exportamos la función envuelta en CORS
+export default cors(handler)
