@@ -2,7 +2,19 @@ import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido' });
+  // Habilitar CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Responder a preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Método no permitido' });
+  }
 
   try {
     const sourceUrl = 'https://www.bibliaon.com/es/palabra_del_dia/';
@@ -23,3 +35,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'No se pudo obtener el devocional', details: error.message });
   }
 }
+
