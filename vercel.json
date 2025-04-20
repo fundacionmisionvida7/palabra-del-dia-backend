@@ -5,7 +5,7 @@
       "src": "api/**/*.js", 
       "use": "@vercel/node",
       "cache": {
-        "node_modules": true  // Cachea dependencias entre deploys
+        "node_modules": true 
       }
     }
   ],
@@ -15,7 +15,7 @@
     { "src": "/api/send-daily", "dest": "api/send-daily.js", "methods": ["GET","OPTIONS"] },
     { "src": "/api/save-token", "dest": "api/save-token.js", "methods": ["GET","OPTIONS"] }
     { "src": "/api/send-notification", "dest": "api/send-notification.js", "methods": ["GET","OPTIONS"] }
-    // ▼▼▼ Agrega estas rutas para archivos estáticos ▼▼▼
+    
     {
       "src": "/(.*\\.(ico|png|jpg|jpeg|svg|css|js|html))",
       "headers": {
