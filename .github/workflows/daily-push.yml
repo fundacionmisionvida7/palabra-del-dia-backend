@@ -1,8 +1,12 @@
 name: Enviar Palabra del Día
+
 on:
+  # 1) Sigue corriendo cada día a las 15:00 UTC (→ 12:00 Córdoba)
   schedule:
-    # 12:00 (UTC–3) = 15:00 UTC
     - cron: '0 15 * * *'
+  # 2) Y ahora también podrás iniciarlo MANUALMENTE
+  workflow_dispatch:
+
 jobs:
   push:
     runs-on: ubuntu-latest
@@ -13,5 +17,5 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{
               "title": "📖 Palabra del Día",
-              "body": "¡Tu devocional de hoy ya está disponible!"
+              "body":  "¡Tu devocional de hoy ya está disponible!"
             }'
