@@ -1,12 +1,22 @@
+// firebaseAdmin.js
 import admin from 'firebase-admin';
 
-let serviceAccount;
+let serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+if (!serviceAccountRaw && process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+  serviceAccountRaw = Buffer
+    .from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64')
+    .toString('utf8');
+}
 
+if (!serviceAccountRaw) {
+  throw new Error('❌ Debes definir FIREBASE_SERVICE_ACCOUNT o FIREBASE_SERVICE_ACCOUNT_B64');
+}
+
+let serviceAccount;
 try {
-  const raw = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
-  serviceAccount = JSON.parse(raw);
+  serviceAccount = JSON.parse(serviceAccountRaw);
 } catch (e) {
-  console.error('❌ Error cargando clave Firebase:', e);
+  console.error('❌ No es un JSON válido:', e);
   throw e;
 }
 
