@@ -34,3 +34,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Error en el servidor", details: error.message });
   }
 }
+
+
+//# Corrección notificación..
