@@ -6,40 +6,19 @@
       "use": "@vercel/node"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/subscribe",
-      "dest": "api/subscribe.js",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/devotional",
-      "dest": "api/devotional.js",
-      "methods": ["GET", "OPTIONS"]
-    },
-    {
-      "src": "/api/send-daily",
-      "dest": "api/send-daily.js",
-      "methods": ["GET", "OPTIONS"]
-    },
-    {
-      "src": "/api/save-token",
-      "dest": "api/save-token.js",
-      "methods": ["POST", "OPTIONS"]
-    },
-    {
-      "src": "/api/send-notification",
-      "dest": "api/send-notification.js",
-      "methods": ["POST", "OPTIONS"]
+      "source": "/palabra-del-dia",
+      "destination": "/api/devotional"
     }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+        { "key": "Access-Control-Allow-Origin",   "value": "*" },
+        { "key": "Access-Control-Allow-Methods",  "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers",  "value": "Content-Type" }
       ]
     }
   ],
