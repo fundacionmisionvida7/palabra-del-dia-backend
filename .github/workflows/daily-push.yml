@@ -1,17 +1,18 @@
 name: Enviar Palabra del Día
 
 on:
-  # 1) Sigue corriendo cada día a las 15:00 UTC (→ 12:00 Córdoba)
+  # Corre todos los días a las 15:00 UTC → 12:00 Córdoba/Argentina
   schedule:
     - cron: '0 15 * * *'
-  # 2) Y ahora también podrás iniciarlo MANUALMENTE
+
+  # También lo podés ejecutar manualmente desde GitHub
   workflow_dispatch:
 
 jobs:
-  push:
+  enviar-devocional:
     runs-on: ubuntu-latest
     steps:
-      - name: Notificar devocional diario
+      - name: Enviar notificación diaria
         run: |
           curl -X POST https://fundacionmisionvida7.vercel.app/api/send-notification \
             -H "Content-Type: application/json" \
