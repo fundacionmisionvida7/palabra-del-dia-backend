@@ -3,10 +3,8 @@
   "builds": [
     { 
       "src": "api/**/*.js", 
-      "use": "@vercel/node",
-      "cache": {
-        "node_modules": true  
-      }
+      "use": "@vercel/node"
+      // ¡Eliminamos la propiedad "cache" aquí!
     }
   ],
   "routes": [
@@ -14,9 +12,7 @@
     { "src": "/api/devotional", "dest": "api/devotional.js", "methods": ["GET","OPTIONS"] },
     { "src": "/api/send-daily", "dest": "api/send-daily.js", "methods": ["GET","OPTIONS"] },
     { "src": "/api/save-token", "dest": "api/save-token.js", "methods": ["GET","OPTIONS"] },
-    { "src": "/api/send-notification", "dest": "api/send-notification.js", "methods": ["GET","OPTIONS"] }
-   
-   ,
+    { "src": "/api/send-notification", "dest": "api/send-notification.js", "methods": ["GET","OPTIONS"] }, // Coma corregida aquí
     {
       "src": "/(.*\\.(ico|png|jpg|jpeg|svg|css|js|html))",
       "headers": {
