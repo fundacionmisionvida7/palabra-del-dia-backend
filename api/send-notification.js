@@ -48,3 +48,4 @@ export default async function handler(req, res) {
     res.status(500).json({ error: "Error interno", details: error.message });
   }
 }
+// api/send-notification.js actualmente bien
