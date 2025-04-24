@@ -1,6 +1,11 @@
 export default async function handler(req, res) {
   // ... Configuración CORS previa ...
+res.setHeader('Access-Control-Allow-Origin', '*');
+res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
+
+  
   try {
     const sourceUrl = 'https://www.bibliaon.com/es/palabra_del_dia/';
     const response = await fetch(sourceUrl);
@@ -58,6 +63,8 @@ export default async function handler(req, res) {
       html: htmlContent,
       source: sourceUrl
     });
+
+
     
   } catch (error) {
     console.error('Error mejorado:', error);
