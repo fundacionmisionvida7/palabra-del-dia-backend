@@ -1,6 +1,5 @@
 import admin from '../firebaseAdmin.js';
 import fetch from 'node-fetch';
-import webpush from 'web-push';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,17 +14,18 @@ export default async function handler(req, res) {
     const devotional = await response.json();
 
     const payload = {
-      title: devotional.title || 'Palabra del Día',
-      body: devotional.html?.replace(/<[^>]+>/g, '').substring(0, 120) + '...' || '¡Tu devocional de hoy está disponible!',
+      title: devotional.title || '📖 Palabra del Día',
+      body: (devotional.html || '').replace(/<[^>]+>/g, '').substring(0, 120) + '...',
       icon: '/icon-192x192.png',
       url: '/'
     };
 
     const db = admin.firestore();
     const snapshot = await db.collection('pushSubscriptions').get();
-    const subscriptions = snapshot.docs.map(doc => doc.data());
+    const subscriptions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    webpush.setVapidDetails(
+    const webPush = await import('web-push');
+    webPush.setVapidDetails(
       'mailto:contacto@misionvida.com',
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY
@@ -33,13 +33,15 @@ export default async function handler(req, res) {
 
     const results = await Promise.all(subscriptions.map(async sub => {
       try {
-        await webpush.sendNotification(sub, JSON.stringify(payload));
+        await webPush.default.sendNotification(sub, JSON.stringify(payload));
         return { status: 'success', endpoint: sub.endpoint };
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
-          if (sub.endpoint) {
-            await db.collection('pushSubscriptions').doc(sub.endpoint).delete();
-          }
+          const docId = sub.endpoint
+            .replace(/https?:\/\//g, '')
+            .replace(/\//g, '_')
+            .replace(/:/g, '-');
+          await db.collection('pushSubscriptions').doc(docId).delete();
         }
         return { status: 'error', endpoint: sub.endpoint, error: err.message };
       }
@@ -50,8 +52,9 @@ export default async function handler(req, res) {
       failed: results.filter(r => r.status === 'error').length,
       details: results
     });
+
   } catch (error) {
     console.error('Error en send-daily:', error);
     return res.status(500).json({ error: 'Fallo al enviar notificaciones', details: error.message });
   }
-}
+      }
