@@ -1,6 +1,8 @@
 import admin from '../firebaseAdmin.js';
 import fetch from 'node-fetch';
-import * as webPush from 'web-push';
+import webPush from 'web-push'; // ← Corregido aquí
+
+export default async function handler(req, res) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
