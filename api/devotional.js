@@ -2,105 +2,108 @@ import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
 
 export default async function handler(req, res) {
+  // Configuración CORS esencial
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  // Manejar preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
 
+  // URL fuente y configuración
   const sourceUrl = 'https://www.bibliaon.com/es/palabra_del_dia/';
-  
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36';
+
   try {
+    // 1. Obtener contenido de Bibliaon.com
     const response = await fetch(sourceUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36'
-      }
+      headers: { 'User-Agent': userAgent }
     });
 
-    if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+    }
 
     const html = await response.text();
     const { document } = new JSDOM(html).window;
 
-    // 1. Selector actualizado para el título
+    // 2. Extracción del título con múltiples selectores
     const title = document.querySelector('h1.daily-title')?.textContent.trim() 
-                || document.querySelector('.post-title')?.textContent.trim() 
+                || document.querySelector('.post-header h1')?.textContent.trim()
+                || document.querySelector('.entry-title')?.textContent.trim()
                 || 'Palabra del Día';
 
-    // 2. Extracción mejorada de fecha
+    // 3. Extracción y formato de fecha
     const dateElement = document.querySelector('.daily-date') || document.querySelector('.post-date');
     const rawDate = dateElement?.textContent.match(/(\d{1,2} de [a-zA-Z]+ de \d{4})/);
-    const date = rawDate ? rawDate[0] : new Date().toLocaleDateString('es-ES', {
+    const formattedDate = rawDate ? rawDate[0] : new Date().toLocaleDateString('es-ES', {
+      weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric'
-    });
+    }).replace(/^\w/, c => c.toUpperCase());
 
-    // 3. Limpieza profunda del contenido
-    const mainContent = document.querySelector('.daily-content') || document.querySelector('.post-content');
-    if (!mainContent) throw new Error('Estructura de contenido no encontrada');
+    // 4. Limpieza del contenido principal
+    const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
+    if (!mainContent) throw new Error('Estructura del contenido no encontrada');
+
+    // Lista de elementos a eliminar
+    const unwantedSelectors = [
+      'a',                          // Todos los enlaces
+      'script',                     // Scripts
+      'style',                      // Estilos
+      '.ads',                       // Anuncios
+      '.sharedaddy',                // Botones sociales
+      '.post-tags',                 // Etiquetas
+      'div[class*="promo"]',        // Promociones
+      'p:has(> strong)',            // Párrafos con texto destacado
+      'p:contains("Te puede interesar")', // Textos promocionales
+      'p:contains("Recibe su Palabra")'   // Llamados a acción
+    ];
 
     // Eliminar elementos no deseados
-    const unwantedSelectors = [
-      '.ad', 
-      '.adsbygoogle', 
-      'script', 
-      'style', 
-      'iframe',
-      '.sharedaddy',
-      '.post-tags',
-      'a[href*="patrocinado"]',
-      'a[href*="publicidad"]'
-    ];
-    
     mainContent.querySelectorAll(unwantedSelectors.join(',')).forEach(el => el.remove());
 
-    // 4. Procesamiento de contenido con limpieza de enlaces
-    const cleanElements = [];
-    const allowedTags = ['P', 'H2', 'H3', 'BLOCKQUOTE', 'UL', 'STRONG', 'EM'];
-    
-    Array.from(mainContent.children).forEach(el => {
-      if (allowedTags.includes(el.tagName)) {
-        // Limpiar enlaces internos
-        const cloneEl = el.cloneNode(true);
-        cloneEl.querySelectorAll('a').forEach(link => {
-          link.replaceWith(document.createTextNode(link.textContent));
-        });
-        
-        // Eliminar atributos de estilo
-        cloneEl.removeAttribute('style');
-        cloneEl.removeAttribute('class');
-        
-        // Filtrar contenido no relevante
-        const textContent = cloneEl.textContent.trim();
-        if (textContent.length > 30 && 
-           !textContent.includes('Te puede interesar') &&
-           !textContent.includes('También te recomendamos')) {
-          cleanElements.push(cloneEl.outerHTML);
-        }
-      }
-    });
+    // 5. Procesamiento final del contenido
+    let cleanHTML = mainContent.innerHTML
+      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')      // Convertir enlaces a texto
+      .replace(/class="[^"]*"/g, '')                // Eliminar clases
+      .replace(/style="[^"]*"/g, '')                // Eliminar estilos
+      .replace(/Leer también:.*?<\/p>/gis, '')      // Eliminar recomendaciones
+      .replace(/Únete ahora.*?<\/p>/gis, '')        // Eliminar llamados a acción
+      .replace(/\n{3,}/g, '\n');                    // Normalizar saltos de línea
 
-    // 5. Validación final del contenido
-    const htmlContent = cleanElements.join('');
-    if (htmlContent.length < 100) throw new Error('Contenido insuficiente');
+    // 6. Validación de contenido mínimo
+    if (cleanHTML.length < 150) {
+      throw new Error('Contenido insuficiente después de la limpieza');
+    }
 
+    // 7. Construir respuesta final
     return res.status(200).json({
-      title,
-      date,
-      html: htmlContent,
+      title: title,
+      date: formattedDate,
+      html: cleanHTML,
       source: sourceUrl
     });
 
   } catch (error) {
-    console.error('Error procesando devocional:', {
-      message: error.message,
-      stack: error.stack
+    // 8. Manejo detallado de errores
+    console.error('Error en devotional.js:', {
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      stack: error.stack,
+      sourceUrl
     });
-    
-    return res.status(500).json({ 
+
+    // 9. Respuesta de error con información controlada
+    return res.status(500).json({
       error: 'El devocional no está disponible temporalmente',
-      details: process.env.NODE_ENV === 'development' ? error.message : null
+      details: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack
+      } : null
     });
   }
 }
