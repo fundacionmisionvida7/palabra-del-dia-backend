@@ -1,5 +1,6 @@
 import admin from '../firebaseAdmin.js';
 import fetch from 'node-fetch';
+import * as webPush from 'web-push';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,20 +21,19 @@ export default async function handler(req, res) {
       url: '/'
     };
 
-    const db = admin.firestore();
-    const snapshot = await db.collection('pushSubscriptions').get();
-    const subscriptions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-    const webPush = await import('web-push');
     webPush.setVapidDetails(
       'mailto:contacto@misionvida.com',
       process.env.VAPID_PUBLIC_KEY,
       process.env.VAPID_PRIVATE_KEY
     );
 
+    const db = admin.firestore();
+    const snapshot = await db.collection('pushSubscriptions').get();
+    const subscriptions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
     const results = await Promise.all(subscriptions.map(async sub => {
       try {
-        await webPush.default.sendNotification(sub, JSON.stringify(payload));
+        await webPush.sendNotification(sub, JSON.stringify(payload));
         return { status: 'success', endpoint: sub.endpoint };
       } catch (err) {
         if (err.statusCode === 410 || err.statusCode === 404) {
@@ -57,4 +57,4 @@ export default async function handler(req, res) {
     console.error('Error en send-daily:', error);
     return res.status(500).json({ error: 'Fallo al enviar notificaciones', details: error.message });
   }
-      }
+                     }
