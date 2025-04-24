@@ -49,22 +49,35 @@ export default async function handler(req, res) {
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
     if (!mainContent) throw new Error('Estructura del contenido no encontrada');
 
-    // Lista de elementos a eliminar
-    const unwantedSelectors = [
-      'a',                          // Todos los enlaces
-      'script',                     // Scripts
-      'style',                      // Estilos
-      '.ads',                       // Anuncios
-      '.sharedaddy',                // Botones sociales
-      '.post-tags',                 // Etiquetas
-      'div[class*="promo"]',        // Promociones
-      'p:has(> strong)',            // Párrafos con texto destacado
-      'p:contains("Te puede interesar")', // Textos promocionales
-      'p:contains("Recibe su Palabra")'   // Llamados a acción
-    ];
+// 4. Limpieza del contenido principal (Selectores actualizados)
+const unwantedSelectors = [
+  'a',                          // Todos los enlaces
+  'script',                     // Scripts
+  'style',                      // Estilos
+  '.ads',                       // Anuncios
+  '.sharedaddy',                // Botones sociales
+  '.post-tags',                 // Etiquetas
+  'div[class*="promo"]',        // Promociones
+  'p > strong',                 // Párrafos con texto destacado
+  'p',                          // Todos los párrafos (filtrado posterior)
+];
 
-    // Eliminar elementos no deseados
-    mainContent.querySelectorAll(unwantedSelectors.join(',')).forEach(el => el.remove());
+// Eliminar elementos no deseados
+mainContent.querySelectorAll(unwantedSelectors.join(',')).forEach(el => {
+  // Filtrado adicional manual para textos específicos
+  if (el.tagName === 'P') {
+    const text = el.textContent.toLowerCase();
+    if (
+      text.includes('te puede interesar') || 
+      text.includes('recibe su palabra') ||
+      text.includes('únete ahora')
+    ) {
+      el.remove();
+    }
+  } else {
+    el.remove();
+  }
+});
 
     // 5. Procesamiento final del contenido
     let cleanHTML = mainContent.innerHTML
