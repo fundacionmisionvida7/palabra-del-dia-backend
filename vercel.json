@@ -10,27 +10,52 @@
     {
       "src": "/api/subscribe",
       "dest": "api/subscribe.js",
-      "methods": ["POST", "OPTIONS"]
+      "methods": ["POST", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/api/devotional",
       "dest": "api/devotional.js",
-      "methods": ["GET", "OPTIONS"]
+      "methods": ["GET", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/api/send-daily",
       "dest": "api/send-daily.js",
-      "methods": ["GET", "OPTIONS"]
+      "methods": ["GET", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/api/save-token",
       "dest": "api/save-token.js",
-      "methods": ["GET", "OPTIONS"]
+      "methods": ["GET", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/api/send-notification",
       "dest": "api/send-notification.js",
-      "methods": ["GET", "OPTIONS"]
+      "methods": ["GET", "OPTIONS"],
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type"
+      }
     },
     {
       "src": "/(.*\\.(ico|png|jpg|jpeg|svg|css|js|html))",
@@ -44,25 +69,6 @@
       "headers": {
         "Cache-Control": "no-cache, no-store, must-revalidate"
       }
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET,POST,OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type"
-        }
-      ]
     }
   ],
   "build": {
