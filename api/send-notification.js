@@ -1,7 +1,7 @@
 // api/send-notification.js
-import admin from "../firebaseAdmin.js";
+const admin = require("../firebaseAdmin");
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   // Permitir CORS en todas las solicitudes
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -47,4 +47,6 @@ export default async function handler(req, res) {
     console.error("❌ Error al enviar notificación:", error);
     res.status(500).json({ error: "Error interno", details: error.message });
   }
-      }
+}
+
+module.exports = handler;
