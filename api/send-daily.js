@@ -21,12 +21,12 @@ export default async function handler(req, res) {
     const response = await fetch('https://nuevo-palabra-del-dia-backend.vercel.app/api/devotional');
     const devotional = await response.json();
 
-    const payload = {
-      title: devotional.title,
-      body: devotional.content.substring(0, 120) + '...',
-      icon: '/icon-192x192.png',
-      url: '/'
-    };
+const payload = {
+  title: devotional.title || '📖 Palabra del Día',
+  body: devotional.html?.replace(/<[^>]+>/g, '').substring(0, 120) + '...',
+  icon: '/icon-192x192.png',
+  url: '/'
+};
 
     const db = admin.firestore();
     const snapshot = await db.collection('pushSubscriptions').get();
