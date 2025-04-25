@@ -20,10 +20,23 @@ export default async function handler(req, res) {
     const { document } = new JSDOM(html).window;
 
     // 1. Extracción del título corregida
-    let title = document.querySelector('h1.daily-title')?.textContent.trim() 
-              || document.querySelector('h1.post-title')?.textContent.trim()
-              || document.querySelector('h1.entry-title')?.textContent.trim()
-              || 'Palabra del Día';
+// Selectores actualizados para Julio 2024 (verificar en Bibliaon.com)
+let title = document.querySelector('h1.daily-title')?.textContent.trim() 
+          || document.querySelector('h1.single-title')?.textContent.trim() 
+          || document.querySelector('h1.entry-title')?.textContent.trim();
+
+// Si fallan todos los selectores, extraer del primer H2 o párrafo destacado
+if (!title || title === 'Palabra del Día') {
+  title = mainContent.querySelector('h2')?.textContent.trim() 
+        || mainContent.querySelector('p > strong')?.textContent.trim() 
+        || mainContent.textContent.match(/(¡.*?!)/)?.[1];
+}
+
+// Limpieza profunda de puntos residuales
+let cleanHTML = mainContent.innerHTML
+  .replace(/<a\b[^>]*>([^<]*)<\/a>/gi, (_, text) => text.replace(/\.$/, '')) // Eliminar puntos finales en enlaces
+  .replace(/\.<\/p>/g, '</p>') // Quitar puntos al final de párrafos
+  .replace(/…/g, ''); // Eliminar puntos suspensivos
 
     // 2. Extracción de contenido PRIMERO
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
