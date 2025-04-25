@@ -36,6 +36,14 @@ export default async function handler(req, res) {
                  || document.querySelector('h1:first-child')?.textContent.trim() // Selector genérico de respaldo
                  || 'Palabra del Día';
 
+    // Agregar después de extraer el título
+if (title === 'Palabra del Día') {
+  // Intentar extraer el título del primer párrafo
+  const firstParagraph = mainContent.querySelector('p:first-of-type')?.textContent;
+  const match = firstParagraph?.match(/(¡.*?!)/); // Buscar texto entre ¡!
+  if (match) title = match[1];
+}
+
     // 3. Extracción y formato de fecha
     const dateElement = document.querySelector('.daily-date') || document.querySelector('.post-date');
     const rawDate = dateElement?.textContent.match(/(\d{1,2} de [a-zA-Z]+ de \d{4})/);
@@ -45,6 +53,7 @@ export default async function handler(req, res) {
       month: 'long',
       year: 'numeric'
     }).replace(/^\w/, c => c.toUpperCase());
+  
 
     // 4. Limpieza del contenido principal
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
