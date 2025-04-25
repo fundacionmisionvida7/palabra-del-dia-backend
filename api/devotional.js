@@ -20,27 +20,26 @@ export default async function handler(req, res) {
     const { document } = new JSDOM(html).window;
 
     // 1. Extracción del título corregida
-// Selectores actualizados para Julio 2024 (verificar en Bibliaon.com)
-let title = document.querySelector('h1.daily-title')?.textContent.trim() 
-          || document.querySelector('h1.single-title')?.textContent.trim() 
-          || document.querySelector('h1.entry-title')?.textContent.trim();
+    let title = document.querySelector('h1.daily-title')?.textContent.trim()
+              || document.querySelector('h1.single-title')?.textContent.trim()
+              || document.querySelector('h1.entry-title')?.textContent.trim();
 
-// Si fallan todos los selectores, extraer del primer H2 o párrafo destacado
-if (!title || title === 'Palabra del Día') {
-  title = mainContent.querySelector('h2')?.textContent.trim() 
-        || mainContent.querySelector('p > strong')?.textContent.trim() 
-        || mainContent.textContent.match(/(¡.*?!)/)?.[1];
-}
-
-// Limpieza profunda de puntos residuales
-let cleanHTML = mainContent.innerHTML
-  .replace(/<a\b[^>]*>([^<]*)<\/a>/gi, (_, text) => text.replace(/\.$/, '')) // Eliminar puntos finales en enlaces
-  .replace(/\.<\/p>/g, '</p>') // Quitar puntos al final de párrafos
-  .replace(/…/g, ''); // Eliminar puntos suspensivos
+    // Si falla, buscar en primeros elementos
+    if (!title || title === 'Palabra del Día') {
+      title = document.querySelector('h2')?.textContent.trim()
+            || document.querySelector('p > strong')?.textContent.trim()
+            || html.match(/(¡.*?!)/)?.[1] || title;
+    }
 
     // 2. Extracción de contenido PRIMERO
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
     if (!mainContent) throw new Error('Estructura de contenido no encontrada');
+
+    // Limpieza profunda de puntos residuales
+    let cleanHTML = mainContent.innerHTML
+      .replace(/<a\b[^>]*>([^<]*)<\/a>/gi, (_, text) => text.replace(/\.$/, ''))
+      .replace(/\.<\/p>/g, '</p>')
+      .replace(/…/g, '');
 
     // 3. Lógica para título alternativo
     if (title === 'Palabra del Día') {
@@ -49,45 +48,25 @@ let cleanHTML = mainContent.innerHTML
       if (titleMatch) title = titleMatch[1];
     }
 
-    // 4. Limpieza de contenido
-    const unwantedSelectors = [
-      'a', 'script', 'style', '.ads', 
-      '.sharedaddy', '.post-tags', 
-      'div[class*="promo"]', 'p > strong'
-    ];
+    // 5. Procesamiento final del contenido (CORRECCIÓN)
+    cleanHTML = cleanHTML
+      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
+      .replace(/class="[^"]*"/g, '')
+      .replace(/style="[^"]*"/g, '')
+      .replace(/(Leer también|Únete ahora).*?<\/p>/gis, '');
 
-    mainContent.querySelectorAll(unwantedSelectors.join(',')).forEach(el => {
-      if (el.tagName === 'P') {
-        const text = el.textContent.toLowerCase();
-        if (text.includes('te puede interesar') || text.includes('recibe su palabra')) {
-          el.remove();
-        }
-      } else {
-        el.remove();
-      }
+    // Validación de contenido
+    if (cleanHTML.length < 150) {
+      throw new Error('Contenido insuficiente después de la limpieza');
+    }
+
+    // 6. Construir respuesta final
+    return res.status(200).json({
+      title: title,
+      date: formattedDate,
+      html: cleanHTML,
+      source: sourceUrl
     });
-
-
-  // 5. Procesamiento final del contenido (CORRECCIÓN)
-  let cleanHTML = mainContent.innerHTML // ← Única declaración con let
-    .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
-    .replace(/class="[^"]*"/g, '')
-    .replace(/style="[^"]*"/g, '')
-    .replace(/(Leer también|Únete ahora).*?<\/p>/gis, '');
-
-  // Validación de contenido (usar misma variable sin redeclarar)
-  if (cleanHTML.length < 150) {
-    throw new Error('Contenido insuficiente después de la limpieza');
-  }
-
-  // 6. Construir respuesta final
-  return res.status(200).json({
-    title: title,
-    date: formattedDate,
-    html: cleanHTML, // ← Usar variable existente
-    source: sourceUrl
-  });
-
 
   } catch (error) {
     console.error('Error en devotional.js:', error);
