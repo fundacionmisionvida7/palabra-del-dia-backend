@@ -24,16 +24,31 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Obtener tokens FCM
-    const tokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-    const tokens = tokensSnapshot.docs.map(doc => doc.id);
+  // Obtener tokens FCM de la colección fcmTokens
+  const tokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+  let tokens = tokensSnapshot.docs.map(doc => doc.data().token || doc.id);
+  
+  // Si no hay suficientes tokens, buscar también en la colección users
+  if (tokens.length < 5) {
+    const usersSnapshot = await admin.firestore().collection("users").get();
+    const userTokens = [];
+    usersSnapshot.docs.forEach(doc => {
+      const userData = doc.data();
+      if (userData.tokens && Array.isArray(userData.tokens)) {
+        userTokens.push(...userData.tokens);
+      }
+    });
+    
+    // Combinar tokens sin duplicados
+    tokens = [...new Set([...tokens, ...userTokens])];
+  }
 
-    if (tokens.length === 0) {
-      return res.status(200).json({ 
-        ok: false, 
-        message: "No hay tokens registrados" 
-      });
-    }
+  if (tokens.length === 0) {
+    return res.status(200).json({ 
+      ok: false, 
+      message: "No hay tokens registrados" 
+    });
+  }
 
     // Configurar mensaje
     const message = {
