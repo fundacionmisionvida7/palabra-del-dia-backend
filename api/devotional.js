@@ -67,27 +67,27 @@ let cleanHTML = mainContent.innerHTML
       }
     });
 
-    // 5. Procesamiento final
-    let cleanHTML = mainContent.innerHTML
-      .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
-      .replace(/class="[^"]*"/g, '')
-      .replace(/style="[^"]*"/g, '')
-      .replace(/(Leer también|Únete ahora).*?<\/p>/gis, '');
 
-    if (cleanHTML.length < 150) throw new Error('Contenido insuficiente');
+  // 5. Procesamiento final del contenido (CORRECCIÓN)
+  let cleanHTML = mainContent.innerHTML // ← Única declaración con let
+    .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
+    .replace(/class="[^"]*"/g, '')
+    .replace(/style="[^"]*"/g, '')
+    .replace(/(Leer también|Únete ahora).*?<\/p>/gis, '');
 
-    // 6. Respuesta
-    return res.status(200).json({
-      title: title,
-      date: new Date().toLocaleDateString('es-ES', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      }),
-      html: cleanHTML,
-      source: sourceUrl
-    });
+  // Validación de contenido (usar misma variable sin redeclarar)
+  if (cleanHTML.length < 150) {
+    throw new Error('Contenido insuficiente después de la limpieza');
+  }
+
+  // 6. Construir respuesta final
+  return res.status(200).json({
+    title: title,
+    date: formattedDate,
+    html: cleanHTML, // ← Usar variable existente
+    source: sourceUrl
+  });
+
 
   } catch (error) {
     console.error('Error en devotional.js:', error);
