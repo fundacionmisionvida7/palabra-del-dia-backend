@@ -29,11 +29,12 @@ export default async function handler(req, res) {
     const html = await response.text();
     const { document } = new JSDOM(html).window;
 
-    // 2. Extracción del título con múltiples selectores
+    // Mejorado: Nuevos selectores para extraer el título específico
     const title = document.querySelector('h1.daily-title')?.textContent.trim() 
-                || document.querySelector('.post-header h1')?.textContent.trim()
-                || document.querySelector('.entry-title')?.textContent.trim()
-                || 'Palabra del Día';
+                 || document.querySelector('.post-title')?.textContent.trim()
+                 || document.querySelector('h1.entry-title')?.textContent.trim()
+                 || document.querySelector('h1:first-child')?.textContent.trim() // Selector genérico de respaldo
+                 || 'Palabra del Día';
 
     // 3. Extracción y formato de fecha
     const dateElement = document.querySelector('.daily-date') || document.querySelector('.post-date');
