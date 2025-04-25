@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
 
 export default async function handler(req, res) {
+  // Configuración CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,37 +19,49 @@ export default async function handler(req, res) {
     const html = await response.text();
     const { document } = new JSDOM(html).window;
 
+    // 1. Contenedor principal del devocional
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
     if (!mainContent) throw new Error('Estructura de contenido no encontrada');
 
-    // Eliminar enlaces, anuncios y basura
-    const unwantedSelectors = [
-      'a', 'script', 'style', '.ads', '.sharedaddy', '.post-tags',
-      'div[class*="promo"]', 'p > strong', 'p > a'
+    // 2. Eliminar elementos no deseados (enlaces, scripts, anuncios, etc.)
+    const unwanted = [
+      'script', 'style', '.ads', '.sharedaddy', '.post-tags', 'div[class*="promo"]',
+      'p > a', 'a'
     ];
-    mainContent.querySelectorAll(unwantedSelectors.join(',')).forEach(el => el.remove());
+    mainContent.querySelectorAll(unwanted.join(',')).forEach(el => el.remove());
+    // Eliminar listas vacías o de recomendación
+    mainContent.querySelectorAll('ul, li').forEach(el => el.remove());
 
+    // 3. Extraer título real (saltando encabezados genéricos)
+    let title;
+    const h2s = Array.from(document.querySelectorAll('h2'));
+    for (const h2 of h2s) {
+      const txt = h2.textContent.trim();
+      if (/^Palabra de (Hoy|Ayer|Anteayer)$/i.test(txt)) continue;
+      title = txt;
+      break;
+    }
+    if (!title) {
+      title = document.querySelector('h1')?.textContent.trim() || 'Palabra del Día';
+    }
+
+    // 4. Limpiar HTML restante (quitar clases, estilos, puntos suspensivos)
     let cleanHTML = mainContent.innerHTML
       .replace(/<a\b[^>]*>(.*?)<\/a>/gi, '$1')
       .replace(/class="[^"]*"/g, '')
       .replace(/style="[^"]*"/g, '')
-      .replace(/(Leer también|Únete ahora).*?<\/p>/gis, '')
       .replace(/…/g, '');
 
     if (cleanHTML.length < 150) {
       throw new Error('Contenido insuficiente después de la limpieza');
     }
 
-    // Extraer título limpio
-    let title = mainContent.querySelector('h2')?.textContent.trim()
-             || mainContent.querySelector('p strong')?.textContent.trim()
-             || document.querySelector('h1')?.textContent.trim()
-             || 'Palabra del Día';
-
+    // 5. Fecha formateada (YYYY-MM-DD)
     const formattedDate = new Date().toISOString().split('T')[0];
 
+    // 6. Responder con JSON limpio
     return res.status(200).json({
-      title: title,
+      title,
       date: formattedDate,
       html: cleanHTML,
       source: sourceUrl
