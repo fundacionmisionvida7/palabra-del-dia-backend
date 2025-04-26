@@ -63,11 +63,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ==================== 1) Web-Push (pushSubscriptions) ====================
+    // ==================== 1) Web-Push (pushSubscriptions) ===
     const webSubsSnap = await admin.firestore().collection("pushSubscriptions").get();
+    // Filtrar suscripciones válidas con endpoint y claves
     const validWebSubs = webSubsSnap.docs.filter(doc => {
-      const keys = doc.data().keys;
-      return keys && keys.p256dh && keys.auth;
+      const data = doc.data();
+      return data.endpoint && data.keys && data.keys.p256dh && data.keys.auth;
     });
     if (validWebSubs.length > 0) {
       const webPush = (await import('web-push')).default;
@@ -78,14 +79,14 @@ export default async function handler(req, res) {
       );
       const payload = JSON.stringify({ title, body, icon: '/icon-192x192.png', url });
       await Promise.all(validWebSubs.map(doc => {
-        const sub = { endpoint: doc.id, keys: doc.data().keys };
-        return webPush.sendNotification(sub, payload)
-          .then(() => console.log(`✅ Web push enviado a endpoint ${doc.id}`))
-          .catch(err => console.error(`❌ Error web-push (${doc.id}):`, err.message));
+        const { endpoint, keys } = doc.data();
+        return webPush.sendNotification({ endpoint, keys }, payload)
+          .then(() => console.log(`✅ Web push enviado a endpoint ${endpoint}`))
+          .catch(err => console.error(`❌ Error web-push (${endpoint}):`, err.message));
       }));
     }
 
-    // ==================== 2) FCM (fcmTokens) ====================
+    // ==================== 2) FCM) FCM (fcmTokens) ====================
     const fcmSnap = await admin.firestore().collection("fcmTokens").get();
     let tokens = fcmSnap.docs.map(d => d.id).filter(t => t && t.length > 10);
     if (tokens.length === 0) {
