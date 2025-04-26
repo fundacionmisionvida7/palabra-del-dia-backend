@@ -92,14 +92,17 @@ export default async function handler(req, res) {
     // Primero probar con la colección pushSubscriptions (para web push)
     try {
       const webPushTokens = [];
-      const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get();
+      const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get(); // Nombre correcto de variable
       
-      pushSubs.forEach(doc => {
-        const sub = doc.data();
-        if (sub.userId && sub.userId === user.uid) { // Filtrar por usuario
-          webPushTokens.push(sub);
-        }
-      });
+      if (!pushSnapshot.empty) {
+        pushSnapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.endpoint) {
+            webPushTokens.push(data);
+          }
+        });
+      }
+      
 
 
       if (!pushSnapshot.empty) {
@@ -148,55 +151,56 @@ export default async function handler(req, res) {
       // Continuar con FCM aunque falle web push
     }
     
-    // Obtener tokens FCM de la colección fcmTokens
-    const tokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-    let tokens = [];
-    
-    tokensSnapshot.forEach(doc => {
-      const data = doc.data();
-      const token = data.token || data.fcmToken || doc.id;
-      if (token && typeof token === 'string' && token.length > 10) {
-        tokens.push(token);
-      }
-    });
-    
-    console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
-    
-    // Si no hay suficientes tokens, buscar también en la colección users
-    if (tokens.length < 5) {
+ // ======== Versión Corregida ========
+// Obtener tokens FCM de todas las fuentes
+let tokens = [];
 
+// 1. Tokens de la colección fcmTokens (si aún la usas)
+const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+fcmTokensSnapshot.forEach(doc => {
+  const token = doc.data().token || doc.id; // Compatibilidad con diferentes estructuras
+  if (validateToken(token)) tokens.push(token);
+});
+
+console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
+
+// 2. Tokens de la colección users (fuente principal)
 const usersSnapshot = await admin.firestore().collection("users")
-.where("fcmToken", "!=", null)
-.get();
+  .where("fcmToken", "!=", null)
+  .get();
 
-const tokens = usersSnapshot.docs.map(doc => doc.data().fcmToken).filter(Boolean);
-      
-      usersSnapshot.forEach(doc => {
-        const userData = doc.data();
-        if (userData.tokens && Array.isArray(userData.tokens)) {
-          userData.tokens.forEach(token => {
-            if (token && typeof token === 'string' && token.length > 10) {
-              tokens.push(token);
-            }
-          });
-        }
-        
-        if (userData.fcmToken && typeof userData.fcmToken === 'string' && userData.fcmToken.length > 10) {
-          tokens.push(userData.fcmToken);
-        }
-      });
-      
-      // Eliminar duplicados
-      tokens = [...new Set(tokens)];
-      console.log(`📱 Total de tokens FCM después de buscar en users: ${tokens.length}`);
-    }
+usersSnapshot.forEach(doc => {
+  const userData = doc.data();
+  
+  // Token en campo fcmToken
+  if (validateToken(userData.fcmToken)) {
+    tokens.push(userData.fcmToken);
+  }
+  
+  // Tokens en array (legacy)
+  if (Array.isArray(userData.tokens)) {
+    userData.tokens.forEach(token => {
+      if (validateToken(token)) tokens.push(token);
+    });
+  }
+});
 
-    if (tokens.length === 0) {
-      return res.status(200).json({ 
-        ok: false, 
-        message: "No hay tokens FCM registrados" 
-      });
-    }
+// Eliminar duplicados y filtrar válidos
+tokens = [...new Set(tokens)].filter(t => t);
+
+console.log(`📱 Total de tokens FCM después de combinar fuentes: ${tokens.length}`);
+
+if (tokens.length === 0) {
+  return res.status(200).json({ 
+    ok: false, 
+    message: "No hay tokens FCM registrados" 
+  });
+}
+
+// ======== Función de validación ========
+function validateToken(token) {
+  return token && typeof token === 'string' && token.length > 10;
+}
 
     // Dividir los tokens en grupos para evitar sobrecargar Firebase
 const chunkSize = 500; // <--- Asegúrate de definir esto
