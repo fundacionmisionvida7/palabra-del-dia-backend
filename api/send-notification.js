@@ -199,23 +199,19 @@ export default async function handler(req, res) {
     const results = [];
     let successCount = 0;
     let failureCount = 0;
-    
-    for (const tokenChunk of tokenChunks) {
-      console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
+
       
       for (const token of tokenChunk) {
+        console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
         try {
           // Crear mensaje para un solo token
           const message = {
             notification: { title, body },
-            data: {
-              url: url || '/', // Campo crítico para la redirección
-              type: type // Ej: "verse", "event", etc.
-            },
-            data: {
-              ...(url ? { url } : {}),
-              title,
-              body,
+            data: {  // Objeto data unificado
+              url: url || '/',
+              type: notificationData.type || 'daily', // Campo type agregado
+              title: title,
+              body: body,
               timestamp: Date.now().toString()
             },
             android: {
@@ -239,7 +235,7 @@ export default async function handler(req, res) {
             },
             token
           };
-          
+      
           // Enviar la notificación
           await admin.messaging().send(message);
           
@@ -254,40 +250,32 @@ export default async function handler(req, res) {
             tokenPrefix: token.substring(0, 8), 
             error: error.message 
           });
-          
-          // Limpiar tokens inválidos
+      
+          // Limpiar tokens inválidos (versión simplificada)
           if (
             error.code === 'messaging/invalid-argument' || 
             error.code === 'messaging/invalid-registration-token' || 
             error.code === 'messaging/registration-token-not-registered'
           ) {
             try {
-              // Intentar eliminar el token inválido de fcmTokens
-              const tokenQuery = await admin.firestore()
-                .collection("fcmTokens")
-                .where('token', '==', token)
+              // Eliminar directamente de fcmTokens usando el token como ID del documento
+              const docRef = admin.firestore().collection("fcmTokens").doc(token);
+              await docRef.delete();
+              console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
+      
+              // Eliminar de users si el token está almacenado en ese campo
+              const usersQuery = await admin.firestore()
+                .collection("users")
+                .where('fcmToken', '==', token)
                 .get();
-              
-              if (!tokenQuery.empty) {
-                tokenQuery.forEach(async doc => {
-                  await doc.ref.delete();
-                  console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
-                });
-              } else {
-                // También buscar en la colección users
-                const usersQuery = await admin.firestore()
-                  .collection("users")
-                  .where('fcmToken', '==', token)
-                  .get();
-                
-                if (!usersQuery.empty) {
-                  usersQuery.forEach(async doc => {
-                    await doc.ref.update({
-                      fcmToken: admin.firestore.FieldValue.delete()
-                    });
-                    console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
+      
+              if (!usersQuery.empty) {
+                usersQuery.forEach(async doc => {
+                  await doc.ref.update({
+                    fcmToken: admin.firestore.FieldValue.delete()
                   });
-                }
+                  console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
+                });
               }
             } catch (deleteError) {
               console.error(`❌ Error al eliminar token inválido:`, deleteError);
@@ -295,7 +283,7 @@ export default async function handler(req, res) {
           }
         }
       }
-    }
+      
 
     console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
 
