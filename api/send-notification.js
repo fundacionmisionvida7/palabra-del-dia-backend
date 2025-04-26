@@ -1,4 +1,4 @@
-// api/send-notification.js (versión combinada)
+// api/send-notification.js (versión combinada y corregida)
 import admin from "../firebaseAdmin.js";
 
 export default async function handler(req, res) {
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
       notificationData = {
         title: "¡Nuevo evento!",
         body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "/eventos"
+        url: "/eventos/EventosNuevos"
       };
     } else if (type === "test") { // Del viejo
       notificationData = {
@@ -180,8 +180,8 @@ export default async function handler(req, res) {
     for (const chunk of chunks) {
       console.log(`🔄 Procesando grupo de ${chunk.length} tokens...`); // Del viejo
       
-      const resp = await admin.messaging().sendAll({
-        tokens: chunk,
+      const resp = await admin.messaging().sendAll(chunk.map(token => ({
+        token: token,
         notification: { title, body },
         data: { url, title, body },
         android: { // Del viejo
@@ -203,7 +203,7 @@ export default async function handler(req, res) {
             }
           }
         }
-      });
+      })));
       
       successCount += resp.successCount;
       failureCount += resp.failureCount;
