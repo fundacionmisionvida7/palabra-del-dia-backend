@@ -1,4 +1,4 @@
-// api/send-notification.js (versión final) v2
+// api/send-notification.js (versión final)
 import admin from "../firebaseAdmin.js";
 
 export default async function handler(req, res) {
@@ -92,19 +92,8 @@ export default async function handler(req, res) {
     // Primero probar con la colección pushSubscriptions (para web push)
     try {
       const webPushTokens = [];
-      const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get(); // Nombre correcto de variable
+      const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get();
       
-      if (!pushSnapshot.empty) {
-        pushSnapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.endpoint) {
-            webPushTokens.push(data);
-          }
-        });
-      }
-      
-
-
       if (!pushSnapshot.empty) {
         pushSnapshot.forEach(doc => {
           const data = doc.data();
@@ -151,76 +140,69 @@ export default async function handler(req, res) {
       // Continuar con FCM aunque falle web push
     }
     
- // ======== Versión Corregida ========
-// Obtener tokens FCM de todas las fuentes
-let tokens = [];
-
-// 1. Tokens de la colección fcmTokens (si aún la usas)
-const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-fcmTokensSnapshot.forEach(doc => {
-  const token = doc.data().token || doc.id; // Compatibilidad con diferentes estructuras
-  if (validateToken(token)) tokens.push(token);
-});
-
-console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
-
-// 2. Tokens de la colección users (fuente principal)
-const usersSnapshot = await admin.firestore().collection("users")
-  .where("fcmToken", "!=", null)
-  .get();
-
-usersSnapshot.forEach(doc => {
-  const userData = doc.data();
-  
-  // Token en campo fcmToken
-  if (validateToken(userData.fcmToken)) {
-    tokens.push(userData.fcmToken);
-  }
-  
-  // Tokens en array (legacy)
-  if (Array.isArray(userData.tokens)) {
-    userData.tokens.forEach(token => {
-      if (validateToken(token)) tokens.push(token);
+    // Obtener tokens FCM de la colección fcmTokens
+    const tokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+    let tokens = [];
+    
+    tokensSnapshot.forEach(doc => {
+      const data = doc.data();
+      const token = data.token || data.fcmToken || doc.id;
+      if (token && typeof token === 'string' && token.length > 10) {
+        tokens.push(token);
+      }
     });
-  }
-});
+    
+    console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
+    
+    // Si no hay suficientes tokens, buscar también en la colección users
+    if (tokens.length < 5) {
+      const usersSnapshot = await admin.firestore().collection("users").get();
+      
+      usersSnapshot.forEach(doc => {
+        const userData = doc.data();
+        if (userData.tokens && Array.isArray(userData.tokens)) {
+          userData.tokens.forEach(token => {
+            if (token && typeof token === 'string' && token.length > 10) {
+              tokens.push(token);
+            }
+          });
+        }
+        
+        if (userData.fcmToken && typeof userData.fcmToken === 'string' && userData.fcmToken.length > 10) {
+          tokens.push(userData.fcmToken);
+        }
+      });
+      
+      // Eliminar duplicados
+      tokens = [...new Set(tokens)];
+      console.log(`📱 Total de tokens FCM después de buscar en users: ${tokens.length}`);
+    }
 
-// Eliminar duplicados y filtrar válidos
-tokens = [...new Set(tokens)].filter(t => t);
-
-console.log(`📱 Total de tokens FCM después de combinar fuentes: ${tokens.length}`);
-
-if (tokens.length === 0) {
-  return res.status(200).json({ 
-    ok: false, 
-    message: "No hay tokens FCM registrados" 
-  });
-}
-
-// ======== Función de validación ========
-function validateToken(token) {
-  return token && typeof token === 'string' && token.length > 10;
-}
+    if (tokens.length === 0) {
+      return res.status(200).json({ 
+        ok: false, 
+        message: "No hay tokens FCM registrados" 
+      });
+    }
 
     // Dividir los tokens en grupos para evitar sobrecargar Firebase
-const chunkSize = 500; // <--- Asegúrate de definir esto
-const tokenChunks = [];
-for (let i = 0; i < tokens.length; i += chunkSize) {
-  tokenChunks.push(tokens.slice(i, i + chunkSize));
-}
-
-console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
+    const chunkSize = 500;
+    const tokenChunks = [];
+    
+    for (let i = 0; i < tokens.length; i += chunkSize) {
+      tokenChunks.push(tokens.slice(i, i + chunkSize));
+    }
+    
+    console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
 
     // Enviar notificaciones token por token para evitar el error de /batch
     const results = [];
     let successCount = 0;
     let failureCount = 0;
 
-  // Procesar cada grupo
-for (const chunk of tokenChunks) {
-  console.log(`🔄 Procesando grupo de ${chunk.length} tokens...`);
-    
-  for (const token of chunk) {
+      
+      for (const token of tokenChunk) {
+        console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
         try {
           // Crear mensaje para un solo token
           const message = {
@@ -277,28 +259,30 @@ for (const chunk of tokenChunks) {
           ) {
             try {
               // Eliminar directamente de fcmTokens usando el token como ID del documento
-          // Eliminar de ambas colecciones en paralelo
-          await Promise.all([
-            admin.firestore().collection("fcmTokens").doc(token).delete(),
-            admin.firestore().collection("users")
-              .where("fcmToken", "==", token)
-              .get()
-              .then(snapshot => {
-                snapshot.docs.forEach(doc => 
-                  doc.ref.update({ fcmToken: admin.firestore.FieldValue.delete() })
-                );
-              })
-          ]);
-          console.log(`🔒 Token ${token.substring(0, 8)} eliminado completamente`);
-        } catch (error) {
-          console.error("⚠️ Error limpiando token:", error);
-        }
+              const docRef = admin.firestore().collection("fcmTokens").doc(token);
+              await docRef.delete();
+              console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
       
+              // Eliminar de users si el token está almacenado en ese campo
+              const usersQuery = await admin.firestore()
+                .collection("users")
+                .where('fcmToken', '==', token)
+                .get();
+      
+              if (!usersQuery.empty) {
+                usersQuery.forEach(async doc => {
+                  await doc.ref.update({
+                    fcmToken: admin.firestore.FieldValue.delete()
+                  });
+                  console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
+                });
+              }
+            } catch (deleteError) {
+              console.error(`❌ Error al eliminar token inválido:`, deleteError);
+            }
           }
         }
-      }};
-
-
+      }
       
 
     console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
@@ -321,93 +305,3 @@ for (const chunk of tokenChunks) {
     });
   }
 }
-
-
-
-// Antes de enviar, desduplica tokens
-const uniqueTokens = [...new Set(tokens)];
-
-// Dividir en grupos más pequeños para evitar timeout
-const CHUNK_SIZE = 300; // Menor que el límite de 500 de Firebase
-for (let i = 0; i < uniqueTokens.length; i += CHUNK_SIZE) {
-  const chunk = uniqueTokens.slice(i, i + CHUNK_SIZE);
-  await sendChunk(chunk);
-}
-
-async function sendChunk(chunk) {
-  try {
-    const messages = chunk.map(token => ({
-      notification: { title, body },
-      data: { url, type: notificationData.type || 'daily' },
-      token
-    }));
-
-    // Enviar como lote
-    const batchResponse = await admin.messaging().sendEach(messages);
-    
-    // Procesar respuestas
-    batchResponse.responses.forEach((response, index) => {
-      if (!response.success) {
-        handleInvalidToken(chunk[index]);
-      }
-    });
-  } catch (error) {
-    console.error("🔥 Error en chunk:", error);
-  }
-}
-
-
-// En la sección de web push:
-const validSubscriptions = [];
-for (const sub of webPushTokens) {
-  try {
-    const response = await fetch(sub.endpoint, { method: 'HEAD' });
-    if (response.status === 200) {
-      validSubscriptions.push(sub);
-    } else {
-      await admin.firestore().collection("pushSubscriptions")
-        .doc(sub.endpoint).delete();
-    }
-  } catch (error) {
-    await admin.firestore().collection("pushSubscriptions")
-      .doc(sub.endpoint).delete();
-  }
-}
-
-// Usar solo suscripciones válidas
-webPushResults = await Promise.all(validSubscriptions.map(sendWebPush));
-
-
-
-// Configurar timeout personalizado
-const TIMEOUT_MS = 9000; // Menor que el límite de 10s de Vercel
-
-const sendWithTimeout = async (promise) => {
-  const timeout = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error("Timeout")), TIMEOUT_MS)
-  );
-  return Promise.race([promise, timeout]);
-};
-
-// Usar en ambos casos
-await sendWithTimeout(sendChunk(chunk));
-await sendWithTimeout(sendWebPush(sub));
-
-
-// Antes de enviar, verificar plataforma
-const filterTokens = (tokens) => {
-  const seen = new Set();
-  return tokens.filter(token => {
-    const isWeb = token.startsWith('https://fcm.googleapis.com');
-    const isMobile = !isWeb;
-    
-    // Priorizar móviles
-    if (isMobile && !seen.has(token)) {
-      seen.add(token);
-      return true;
-    }
-    return false;
-  });
-};
-
-const filteredTokens = filterTokens(uniqueTokens);
