@@ -1,4 +1,4 @@
-// api/send-notification.js (versión final)
+// api/send-notification.js (versión final) v2
 import admin from "../firebaseAdmin.js";
 
 export default async function handler(req, res) {
@@ -94,6 +94,14 @@ export default async function handler(req, res) {
       const webPushTokens = [];
       const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get();
       
+      pushSubs.forEach(doc => {
+        const sub = doc.data();
+        if (sub.userId && sub.userId === user.uid) { // Filtrar por usuario
+          webPushTokens.push(sub);
+        }
+      });
+
+
       if (!pushSnapshot.empty) {
         pushSnapshot.forEach(doc => {
           const data = doc.data();
@@ -156,7 +164,12 @@ export default async function handler(req, res) {
     
     // Si no hay suficientes tokens, buscar también en la colección users
     if (tokens.length < 5) {
-      const usersSnapshot = await admin.firestore().collection("users").get();
+
+const usersSnapshot = await admin.firestore().collection("users")
+.where("fcmToken", "!=", null)
+.get();
+
+const tokens = usersSnapshot.docs.map(doc => doc.data().fcmToken).filter(Boolean);
       
       usersSnapshot.forEach(doc => {
         const userData = doc.data();
