@@ -63,6 +63,13 @@ export default async function handler(req, res) {
         body: "¡Ya está disponible el nuevo evento para ver!",
         url: "/eventos" // Ruta corregida
       };
+        ...
+} else if (type === "live") {  // <<< nuevo
+  notificationData = {
+    title: "¡Estamos en vivo!",
+    body: "Únete a la transmisión del culto ahora mismo.",
+    url: "/en-vivo"
+  };
     } else if (type === "test") {
       notificationData = {
         title: "🧪 Notificación de prueba",
