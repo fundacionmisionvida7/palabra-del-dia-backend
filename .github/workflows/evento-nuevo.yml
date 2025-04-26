@@ -1,0 +1,15 @@
+name: Evento Nuevo
+
+on:
+  schedule:
+    - cron: '0 20 * * *'  # Todos los días a las 20:00 UTC → 17:00 Argentina
+  workflow_dispatch:
+
+jobs:
+  evento:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar notificación del evento
+        run: |
+          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=event"
+
