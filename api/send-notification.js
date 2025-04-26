@@ -186,23 +186,24 @@ export default async function handler(req, res) {
     }
 
     // Dividir los tokens en grupos para evitar sobrecargar Firebase
-    const chunkSize = 500;
-    const tokenChunks = [];
-    
-    for (let i = 0; i < tokens.length; i += chunkSize) {
-      tokenChunks.push(tokens.slice(i, i + chunkSize));
-    }
-    
-    console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
+const chunkSize = 500; // <--- Asegúrate de definir esto
+const tokenChunks = [];
+for (let i = 0; i < tokens.length; i += chunkSize) {
+  tokenChunks.push(tokens.slice(i, i + chunkSize));
+}
+
+console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
 
     // Enviar notificaciones token por token para evitar el error de /batch
     const results = [];
     let successCount = 0;
     let failureCount = 0;
 
-      
-      for (const token of tokenChunk) {
-        console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
+  // Procesar cada grupo
+for (const chunk of tokenChunks) {
+  console.log(`🔄 Procesando grupo de ${chunk.length} tokens...`);
+    
+  for (const token of chunk) {
         try {
           // Crear mensaje para un solo token
           const message = {
@@ -282,7 +283,7 @@ export default async function handler(req, res) {
             }
           }
         }
-      }
+      }}
       
 
     console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
