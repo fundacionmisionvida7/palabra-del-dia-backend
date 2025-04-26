@@ -1,0 +1,35 @@
+name: Verificar si hay Culto en Vivo
+
+on:
+  schedule:
+    - cron: '*/5 * * * *' # Cada 5 minutos
+  workflow_dispatch:
+
+jobs:
+  check-live:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar transmisión en vivo
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          CHANNEL_ID: UC_cQTyQB4mDHiLU9qrWO_iA
+        run: |
+          echo "Consultando YouTube Live..."
+          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+          
+          LIVE_COUNT=$(echo $RESPONSE | jq '.items | length')
+          
+          echo "Cantidad de transmisiones en vivo: $LIVE_COUNT"
+          
+          if [ "$LIVE_COUNT" -gt "0" ]; then
+            echo "¡Hay transmisión en vivo! Enviando notificación..."
+            curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
+              -H "Content-Type: application/json" \
+              --retry 3 \
+              --retry-delay 5 \
+              --connect-timeout 30 \
+              --max-time 60
+          else
+            echo "No hay transmisión en vivo actualmente."
+          fi
+        timeout-minutes: 5
