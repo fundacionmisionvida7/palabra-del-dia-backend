@@ -1,0 +1,14 @@
+name: Versículo del Día
+
+on:
+  schedule:
+    - cron: '0 14 * * *'  # 14:00 UTC → 11:00 Argentina
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar versículo del día
+        run: |
+          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse"
