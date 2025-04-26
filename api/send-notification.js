@@ -283,7 +283,7 @@ for (const chunk of tokenChunks) {
             }
           }
         }
-      }}
+      }};
       
 
     console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
