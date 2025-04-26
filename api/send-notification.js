@@ -35,7 +35,6 @@ export default async function handler(req, res) {
   let notificationData = {};
 
   if (req.method === "POST") {
-    // Soporta cuerpo JSON para pruebas
     console.log("📩 Solicitud POST recibida");
     notificationData = req.body || {};
   } else if (req.method === "GET") {
@@ -44,29 +43,13 @@ export default async function handler(req, res) {
     console.log(`🔔 Tipo de notificación: ${type}`);
 
     if (type === "daily") {
-      notificationData = {
-        title: "📖 Palabra del Día",
-        body: "¡Tu devocional de hoy ya está disponible!",
-        url: "/"
-      };
+      notificationData = { title: "📖 Palabra del Día", body: "¡Tu devocional de hoy ya está disponible!", url: "/" };
     } else if (type === "verse") {
-      notificationData = {
-        title: "¡Nuevo versículo del día!",
-        body: "No te lo pierdas, ya está disponible",
-        url: "/versiculo"
-      };
+      notificationData = { title: "¡Nuevo versículo del día!", body: "No te lo pierdas, ya está disponible", url: "/versiculo" };
     } else if (type === "event") {
-      notificationData = {
-        title: "¡Nuevo evento!",
-        body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "/eventos/EventosNuevos"
-      };
+      notificationData = { title: "¡Nuevo evento!", body: "¡Ya está disponible el nuevo evento para ver!", url: "/eventos" };
     } else if (type === "test") {
-      notificationData = {
-        title: "🧪 Notificación de prueba",
-        body: `Esta es una notificación de prueba (${new Date().toLocaleString()})`,
-        url: "/"
-      };
+      notificationData = { title: "🧪 Notificación de prueba", body: `Esta es una notificación de prueba (${new Date().toLocaleString()})`, url: "/" };
     } else {
       return res.status(400).json({ error: "Tipo de notificación no válido. Use 'daily', 'verse', 'event' o 'test'" });
     }
@@ -82,7 +65,11 @@ export default async function handler(req, res) {
   try {
     // ==================== 1) Web-Push (pushSubscriptions) ====================
     const webSubsSnap = await admin.firestore().collection("pushSubscriptions").get();
-    if (!webSubsSnap.empty) {
+    const validWebSubs = webSubsSnap.docs.filter(doc => {
+      const keys = doc.data().keys;
+      return keys && keys.p256dh && keys.auth;
+    });
+    if (validWebSubs.length > 0) {
       const webPush = (await import('web-push')).default;
       webPush.setVapidDetails(
         'mailto:contacto@misionvida.com',
@@ -90,60 +77,49 @@ export default async function handler(req, res) {
         process.env.VAPID_PRIVATE_KEY
       );
       const payload = JSON.stringify({ title, body, icon: '/icon-192x192.png', url });
-      await Promise.all(webSubsSnap.docs.map(doc => {
+      await Promise.all(validWebSubs.map(doc => {
         const sub = { endpoint: doc.id, keys: doc.data().keys };
         return webPush.sendNotification(sub, payload)
-          .then(() => console.log(`✅ Web push enviado a ${doc.id}`))
+          .then(() => console.log(`✅ Web push enviado a endpoint ${doc.id}`))
           .catch(err => console.error(`❌ Error web-push (${doc.id}):`, err.message));
       }));
     }
 
     // ==================== 2) FCM (fcmTokens) ====================
     const fcmSnap = await admin.firestore().collection("fcmTokens").get();
-    const tokens = fcmSnap.docs.map(d => d.id).filter(t => t && t.length > 10);
+    let tokens = fcmSnap.docs.map(d => d.id).filter(t => t && t.length > 10);
     if (tokens.length === 0) {
       return res.status(200).json({ ok: false, message: "No hay tokens FCM registrados" });
     }
 
-    // Dividir en grupos de 500
-    const chunkSize = 500;
-    const tokenChunks = [];
-    for (let i = 0; i < tokens.length; i += chunkSize) {
-      tokenChunks.push(tokens.slice(i, i + chunkSize));
-    }
+    // Deduplicar (aunque doc IDs ya únicos)
+    tokens = [...new Set(tokens)];
 
-    let successCount = 0;
-    let failureCount = 0;
+    // Enviar con sendMulticast
+    const multicastResp = await admin.messaging().sendMulticast({
+      tokens,
+      notification: { title, body },
+      data: { url, title, body }
+    });
 
-    for (const chunk of tokenChunks) {
-      const response = await admin.messaging().sendAll({
-        tokens: chunk,
-        notification: { title, body },
-        data: { url, title, body }
-      });
-
-      successCount += response.successCount;
-      failureCount += response.failureCount;
-
-      response.responses.forEach((resp, idx) => {
-        if (resp.error) {
-          console.error(`❌ FCM error token ${chunk[idx].slice(0,8)}...:`, resp.error.message);
-          // Eliminar token inválido
-          const code = resp.error.code;
-          if ([
-            'messaging/invalid-registration-token',
-            'messaging/registration-token-not-registered'
-          ].includes(code)) {
-            admin.firestore().collection("fcmTokens").doc(chunk[idx]).delete()
-              .then(() => console.log(`🗑️ Token inválido eliminado: ${chunk[idx]}`))
-              .catch(e => console.error("❌ Error eliminando token inválido:", e));
-          }
+    // Manejo de resultados y limpieza de tokens inválidos
+    multicastResp.responses.forEach((resp, idx) => {
+      if (resp.error) {
+        console.error(`❌ FCM error token ${tokens[idx].slice(0,8)}...:`, resp.error.message);
+        const code = resp.error.code;
+        if ([
+          'messaging/invalid-registration-token',
+          'messaging/registration-token-not-registered'
+        ].includes(code)) {
+          admin.firestore().collection("fcmTokens").doc(tokens[idx]).delete()
+            .then(() => console.log(`🗑️ Token inválido eliminado: ${tokens[idx]}`))
+            .catch(e => console.error("❌ Error eliminando token inválido:", e));
         }
-      });
-    }
+      }
+    });
 
-    console.log(`✅ Notificación procesada: ${successCount} éxitos, ${failureCount} fallos`);
-    return res.status(200).json({ ok: true, successCount, failureCount, total: tokens.length });
+    console.log(`✅ Notificación FCM: ${multicastResp.successCount} éxitos, ${multicastResp.failureCount} fallos`);
+    return res.status(200).json({ ok: true, successCount: multicastResp.successCount, failureCount: multicastResp.failureCount, total: tokens.length });
 
   } catch (error) {
     console.error("❌ Error general al procesar notificaciones:", error);
