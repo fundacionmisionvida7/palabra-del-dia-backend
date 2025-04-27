@@ -61,16 +61,15 @@ export default async function handler(req, res) {
       notificationData = {
         title: "¡Nuevo evento!",
         body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "/eventos" // Ruta corregida
+        url: "/eventos"
       };
-        ...
-} else if (type === "live") {  // <<< nuevo
-  notificationData = {
-    title: "¡Estamos en vivo!",
-    body: "Únete a la transmisión del culto ahora mismo.",
-    url: "/en-vivo"
-  };
-    } else if (type === "test") {
+    } else if (type === "live") {  // <<< Corregido
+      notificationData = {
+        title: "¡Estamos en vivo!",
+        body: "Únete a la transmisión del culto ahora mismo.",
+        url: "/en-vivo"
+      };
+    } else if (type === "test") {  // <<< Llave correctamente cerrada
       notificationData = {
         title: "🧪 Notificación de prueba",
         body: "Esta es una notificación de prueba (" + new Date().toLocaleString() + ")",
@@ -192,123 +191,124 @@ export default async function handler(req, res) {
       });
     }
 
-    // Dividir los tokens en grupos para evitar sobrecargar Firebase
-    const chunkSize = 500;
-    const tokenChunks = [];
-    
-    for (let i = 0; i < tokens.length; i += chunkSize) {
-      tokenChunks.push(tokens.slice(i, i + chunkSize));
-    }
-    
-    console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
-
-    // Enviar notificaciones token por token para evitar el error de /batch
-    const results = [];
-    let successCount = 0;
-    let failureCount = 0;
-
-      
-      for (const token of tokenChunk) {
-        console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
-        try {
-          // Crear mensaje para un solo token
-          const message = {
-            notification: { title, body },
-            data: {  // Objeto data unificado
-              url: url || '/',
-              type: notificationData.type || 'daily', // Campo type agregado
-              title: title,
-              body: body,
-              timestamp: Date.now().toString()
-            },
-            android: {
-              notification: {
-                icon: 'ic_notification',
-                color: '#F57C00',
-                sound: 'default'
-              },
-              priority: 'high'
-            },
-            apns: {
-              headers: {
-                'apns-priority': '10'
-              },
-              payload: {
-                aps: {
-                  sound: 'default',
-                  category: 'DEVOTIONAL'
-                }
-              }
-            },
-            token
-          };
-      
-          // Enviar la notificación
-          await admin.messaging().send(message);
-          
-          successCount++;
-          results.push({ status: 'success', tokenPrefix: token.substring(0, 8) });
-        } catch (error) {
-          console.error(`❌ Error al enviar a token ${token.substring(0, 8)}...`, error.message);
-          
-          failureCount++;
-          results.push({ 
-            status: 'error', 
-            tokenPrefix: token.substring(0, 8), 
-            error: error.message 
-          });
-      
-          // Limpiar tokens inválidos (versión simplificada)
-          if (
-            error.code === 'messaging/invalid-argument' || 
-            error.code === 'messaging/invalid-registration-token' || 
-            error.code === 'messaging/registration-token-not-registered'
-          ) {
-            try {
-              // Eliminar directamente de fcmTokens usando el token como ID del documento
-              const docRef = admin.firestore().collection("fcmTokens").doc(token);
-              await docRef.delete();
-              console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
-      
-              // Eliminar de users si el token está almacenado en ese campo
-              const usersQuery = await admin.firestore()
-                .collection("users")
-                .where('fcmToken', '==', token)
-                .get();
-      
-              if (!usersQuery.empty) {
-                usersQuery.forEach(async doc => {
-                  await doc.ref.update({
-                    fcmToken: admin.firestore.FieldValue.delete()
-                  });
-                  console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
-                });
-              }
-            } catch (deleteError) {
-              console.error(`❌ Error al eliminar token inválido:`, deleteError);
-            }
-          }
-        }
-      }
-      
-
-    console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
-
-    // Responder con resultados
-    return res.status(200).json({
-      ok: true,
-      successCount,
-      failureCount,
-      total: tokens.length,
-      sampleResults: results.slice(0, 10) // Solo mostrar una muestra
-    });
-
-  } catch (error) {
-    console.error("❌ Error general al procesar notificaciones:", error);
-    return res.status(500).json({ 
-      error: "Error interno al procesar notificaciones", 
-      details: error.message,
-      stack: error.stack
-    });
-  }
-}
+       // Dividir los tokens en grupos para evitar sobrecargar Firebase
+       const chunkSize = 500;
+       const tokenChunks = [];
+       
+       for (let i = 0; i < tokens.length; i += chunkSize) {
+         tokenChunks.push(tokens.slice(i, i + chunkSize));
+       }
+       
+       console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
+   
+       // Enviar notificaciones token por token para evitar el error de /batch
+       const results = [];
+       let successCount = 0;
+       let failureCount = 0;
+   
+       // Bucle corregido
+       for (const tokenChunk of tokenChunks) {
+         console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
+         for (const token of tokenChunk) {  // Bucle interno para cada token
+           try {
+             // Crear mensaje para un solo token
+             const message = {
+               notification: { title, body },
+               data: {
+                 url: url || '/',
+                 type: notificationData.type || 'daily',
+                 title: title,
+                 body: body,
+                 timestamp: Date.now().toString()
+               },
+               android: {
+                 notification: {
+                   icon: 'ic_notification',
+                   color: '#F57C00',
+                   sound: 'default'
+                 },
+                 priority: 'high'
+               },
+               apns: {
+                 headers: {
+                   'apns-priority': '10'
+                 },
+                 payload: {
+                   aps: {
+                     sound: 'default',
+                     category: 'DEVOTIONAL'
+                   }
+                 }
+               },
+               token
+             };
+         
+             // Enviar la notificación
+             await admin.messaging().send(message);
+             
+             successCount++;
+             results.push({ status: 'success', tokenPrefix: token.substring(0, 8) });
+           } catch (error) {
+             console.error(`❌ Error al enviar a token ${token.substring(0, 8)}...`, error.message);
+             
+             failureCount++;
+             results.push({ 
+               status: 'error', 
+               tokenPrefix: token.substring(0, 8), 
+               error: error.message 
+             });
+         
+             // Limpiar tokens inválidos
+             if (
+               error.code === 'messaging/invalid-argument' || 
+               error.code === 'messaging/invalid-registration-token' || 
+               error.code === 'messaging/registration-token-not-registered'
+             ) {
+               try {
+                 // Eliminar de fcmTokens
+                 const docRef = admin.firestore().collection("fcmTokens").doc(token);
+                 await docRef.delete();
+                 console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
+         
+                 // Eliminar de users
+                 const usersQuery = await admin.firestore()
+                   .collection("users")
+                   .where('fcmToken', '==', token)
+                   .get();
+         
+                 if (!usersQuery.empty) {
+                   usersQuery.forEach(async doc => {
+                     await doc.ref.update({
+                       fcmToken: admin.firestore.FieldValue.delete()
+                     });
+                     console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
+                   });
+                 }
+               } catch (deleteError) {
+                 console.error(`❌ Error al eliminar token inválido:`, deleteError);
+               }
+             }
+           }
+         }  // Cierre del for (token of tokenChunk)
+       }  // Cierre del for (tokenChunk of tokenChunks)
+   
+       console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
+   
+       // Responder con resultados
+       return res.status(200).json({
+         ok: true,
+         successCount,
+         failureCount,
+         total: tokens.length,
+         sampleResults: results.slice(0, 10)
+       });
+   
+     } catch (error) {
+       console.error("❌ Error general al procesar notificaciones:", error);
+       return res.status(500).json({ 
+         error: "Error interno al procesar notificaciones", 
+         details: error.message,
+         stack: error.stack
+       });
+     }
+   }
