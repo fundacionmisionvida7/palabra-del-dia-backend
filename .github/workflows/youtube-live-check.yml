@@ -17,11 +17,11 @@ jobs:
           echo "Consultando YouTube Live..."
           RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
           
-          LIVE_COUNT=$(echo $RESPONSE | jq '.items | length')
+          LIVE_COUNT=$(echo "$RESPONSE" | jq '.items | length')
           
           echo "Cantidad de transmisiones en vivo: $LIVE_COUNT"
           
-          if [ "$LIVE_COUNT" -gt "0" ]; then
+          if [ "$LIVE_COUNT" -gt 0 ]; then
             echo "¡Hay transmisión en vivo! Enviando notificación..."
             curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
               -H "Content-Type: application/json" \
@@ -32,4 +32,4 @@ jobs:
           else
             echo "No hay transmisión en vivo actualmente."
           fi
-        timeout-minutes: 5
+        timeout-minutes: 5 # ⚠️ Asegúrate de que esta línea esté al mismo nivel que 'run' y 'env'
