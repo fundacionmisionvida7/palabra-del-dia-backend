@@ -63,11 +63,11 @@ export default async function handler(req, res) {
         body: "¡Ya está disponible el nuevo evento para ver!",
         url: "#eventos" // Cambiado a hash
       };
-    } else if (type === "live") {  // <<< Corregido
+    } else if (type === "live") {
       notificationData = {
         title: "¡Estamos en vivo!",
         body: "Únete a la transmisión del culto ahora mismo.",
-        url: "/en-vivo"
+        url: "#live" // ✅ Usar hash
       };
     } else if (type === "test") {  // <<< Llave correctamente cerrada
       notificationData = {
@@ -126,7 +126,8 @@ export default async function handler(req, res) {
                 title,
                 body,
                 icon: '/icon-192x192.png',
-                url: url || '/'
+                badge: '/badge.png',
+                data: { url: url || "#" } // ✅ Usar hash
               });
               
               await webPush.sendNotification(sub, payload);
@@ -180,8 +181,8 @@ export default async function handler(req, res) {
       });
       
       // Eliminar duplicados
-      tokens = [...new Set(tokens)];
-      console.log(`📱 Total de tokens FCM después de buscar en users: ${tokens.length}`);
+      tokens = [...new Set(tokens)].filter(t => t.length > 10 && !t.includes(' '));
+      console.log(`📱 Tokens válidos y únicos: ${tokens.length}`);
     }
 
     if (tokens.length === 0) {
