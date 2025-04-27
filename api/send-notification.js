@@ -55,13 +55,13 @@ export default async function handler(req, res) {
       notificationData = {
         title: "¡Nuevo versículo del día!",
         body: "No te lo pierdas, ya está disponible",
-        url: "/versiculo" // Ruta corregida
+        url: "#versiculo" // Cambiado a hash
       };
     } else if (type === "event") {
       notificationData = {
         title: "¡Nuevo evento!",
         body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "/eventos"
+        url: "#eventos" // Cambiado a hash
       };
     } else if (type === "live") {  // <<< Corregido
       notificationData = {
