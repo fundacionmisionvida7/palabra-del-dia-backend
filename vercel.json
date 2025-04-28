@@ -75,5 +75,10 @@
     "env": {
       "NODE_ENV": "production"
     }
+  },
+  "functions": {
+    "api/send-notification.js": {
+      "maxDuration": 30
+    }
   }
 }
