@@ -95,6 +95,19 @@ export default async function handler(req, res) {
 
   try {
     console.log("🔍 Buscando tokens de dispositivo...");
+    // ---- 🧹 NUEVO CÓDIGO ----
+// Limpiar tokens expirados
+console.log("🧹 Eliminando tokens caducados...");
+const expiredTokens = await admin.firestore().collection("fcmTokens")
+  .where("expiresAt", "<", new Date())
+  .get();
+
+const batch = admin.firestore().batch();
+expiredTokens.docs.forEach(doc => batch.delete(doc.ref));
+await batch.commit();
+console.log(`🗑️ Eliminados ${expiredTokens.size} tokens expirados`);
+// ---- FIN DEL NUEVO CÓDIGO ----
+
     // Primero probar con la colección pushSubscriptions (para web push)
     try {
       const webPushTokens = [];
@@ -120,23 +133,29 @@ export default async function handler(req, res) {
             process.env.VAPID_PRIVATE_KEY
           );
           
-          const webPushResults = await Promise.all(webPushTokens.map(async sub => {
-            try {
-              const payload = JSON.stringify({
-                title,
-                body,
-                icon: '/icon-192x192.png',
-                badge: '/badge.png',
-                data: { url: url || "#" } // ✅ Usar hash
-              });
-              
-              await webPush.sendNotification(sub, payload);
-              return { status: 'success', type: 'web' };
-            } catch (err) {
-              console.error(`❌ Error en web push:`, err.message);
-              return { status: 'error', type: 'web', error: err.message };
-            }
-          }));
+          const validSubscriptions = [];
+for (const sub of webPushTokens) {
+  try {
+    // Verificar si la suscripción es válida
+    await webPush.sendNotification(sub, JSON.stringify({ title: 'PING', body: '' }));
+    validSubscriptions.push(sub);
+  } catch (error) {
+    await admin.firestore().collection("pushSubscriptions").doc(sub.endpoint).delete();
+  }
+}
+
+const webPushResults = await Promise.all(validSubscriptions.map)(async sub => {
+  const payload = JSON.stringify({
+    title,
+    body,
+    icon: '/icon-192x192.png',
+    badge: '/badge.png',
+    data: { url: url || "#" }
+  });
+  return webPush.sendNotification(sub, payload)
+    .then(() => ({ status: 'success' }))
+    .catch(() => ({ status: 'error' }));
+});
           
           const webSuccessCount = webPushResults.filter(r => r.status === 'success').length;
           console.log(`✅ Enviadas ${webSuccessCount} notificaciones web push`);
@@ -148,8 +167,22 @@ export default async function handler(req, res) {
     }
     
     // Obtener tokens FCM de la colección fcmTokens
-    const tokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-    let tokens = [];
+    const tokensSet = new Set();
+
+    // Obtener de fcmTokens
+    const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+    fcmTokensSnapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.token) tokensSet.add(data.token);
+    });
+    
+    // Obtener de users
+    const usersSnapshot = await admin.firestore().collection("users").get();
+    usersSnapshot.forEach(doc => {
+      const userData = doc.data();
+      if (userData.fcmToken) tokensSet.add(userData.fcmToken);
+      if (userData.tokens) userData.tokens.forEach(t => tokensSet.add(t));
+    });
     
     tokensSnapshot.forEach(doc => {
       const data = doc.data();
@@ -193,107 +226,87 @@ export default async function handler(req, res) {
     }
 
        // Dividir los tokens en grupos para evitar sobrecargar Firebase
-       const chunkSize = 500;
-       const tokenChunks = [];
-       
-       for (let i = 0; i < tokens.length; i += chunkSize) {
-         tokenChunks.push(tokens.slice(i, i + chunkSize));
-       }
-       
-       console.log(`📱 Tokens divididos en ${tokenChunks.length} grupos`);
-   
-       // Enviar notificaciones token por token para evitar el error de /batch
-       const results = [];
-       let successCount = 0;
-       let failureCount = 0;
-   
-       // Bucle corregido
-       for (const tokenChunk of tokenChunks) {
-         console.log(`🔄 Procesando grupo de ${tokenChunk.length} tokens...`);
-         for (const token of tokenChunk) {  // Bucle interno para cada token
-           try {
-             // Crear mensaje para un solo token
-             const message = {
-               notification: { title, body },
-               data: {
-                 url: url || '/',
-                 type: notificationData.type || 'daily',
-                 title: title,
-                 body: body,
-                 timestamp: Date.now().toString()
-               },
-               android: {
-                 notification: {
-                   icon: 'ic_notification',
-                   color: '#F57C00',
-                   sound: 'default'
-                 },
-                 priority: 'high'
-               },
-               apns: {
-                 headers: {
-                   'apns-priority': '10'
-                 },
-                 payload: {
-                   aps: {
-                     sound: 'default',
-                     category: 'DEVOTIONAL'
-                   }
-                 }
-               },
-               token
-             };
-         
-             // Enviar la notificación
-             await admin.messaging().send(message);
-             
-             successCount++;
-             results.push({ status: 'success', tokenPrefix: token.substring(0, 8) });
-           } catch (error) {
-             console.error(`❌ Error al enviar a token ${token.substring(0, 8)}...`, error.message);
-             
-             failureCount++;
-             results.push({ 
-               status: 'error', 
-               tokenPrefix: token.substring(0, 8), 
-               error: error.message 
-             });
-         
-             // Limpiar tokens inválidos
-             if (
-               error.code === 'messaging/invalid-argument' || 
-               error.code === 'messaging/invalid-registration-token' || 
-               error.code === 'messaging/registration-token-not-registered'
-             ) {
-               try {
-                 // Eliminar de fcmTokens
-                 const docRef = admin.firestore().collection("fcmTokens").doc(token);
-                 await docRef.delete();
-                 console.log(`🗑️ Token eliminado de fcmTokens: ${token.substring(0, 8)}...`);
-         
-                 // Eliminar de users
-                 const usersQuery = await admin.firestore()
-                   .collection("users")
-                   .where('fcmToken', '==', token)
-                   .get();
-         
-                 if (!usersQuery.empty) {
-                   usersQuery.forEach(async doc => {
-                     await doc.ref.update({
-                       fcmToken: admin.firestore.FieldValue.delete()
-                     });
-                     console.log(`🗑️ Token eliminado de users: ${token.substring(0, 8)}...`);
-                   });
-                 }
-               } catch (deleteError) {
-                 console.error(`❌ Error al eliminar token inválido:`, deleteError);
-               }
-             }
-           }
-         }  // Cierre del for (token of tokenChunk)
-       }  // Cierre del for (tokenChunk of tokenChunks)
-   
-       console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
+ // 🚀 Enviar notificaciones en lotes
+console.log("🚀 Enviando notificaciones en lotes...");
+
+try {
+  // Crear mensajes
+  const messages = tokens.map(token => ({
+    token,
+    notification: { title, body },
+    data: {
+      url: url || "#",
+      type: notificationData.type || 'general',
+      timestamp: Date.now().toString()
+    },
+    android: { 
+      notification: { 
+        icon: 'ic_notification', 
+        color: '#F57C00', 
+        sound: 'default' 
+      } 
+    },
+    apns: { 
+      headers: { 'apns-priority': '10' }, 
+      payload: { 
+        aps: { 
+          sound: 'default',
+          category: 'DEVOTIONAL'
+        } 
+      } 
+    }
+  }));
+
+  // Dividir en lotes de 500
+  const chunks = [];
+  while (messages.length > 0) {
+    chunks.push(messages.splice(0, 500));
+  }
+
+  let successCount = 0;
+  let failureCount = 0;
+
+  // Procesar cada lote
+  for (const chunk of chunks) {
+    try {
+      const response = await admin.messaging().sendEach(chunk);
+      successCount += response.successCount;
+      failureCount += response.failureCount;
+
+      // Eliminar tokens fallidos
+      const deadTokens = response.responses
+        .filter((r, idx) => !r.success)
+        .map((r, idx) => chunk[idx].token);
+
+      const batch = admin.firestore().batch();
+      deadTokens.forEach(token => {
+        batch.delete(admin.firestore().collection("fcmTokens").doc(token));
+      });
+      await batch.commit();
+
+    } catch (error) {
+      failureCount += chunk.length;
+      console.error("❌ Error en lote:", error);
+    }
+  }
+
+  console.log(`✅ Notificación "${title}" procesada: ${successCount} éxitos, ${failureCount} fallos`);
+
+  // Respuesta exitosa
+  return res.status(200).json({
+    ok: true,
+    successCount,
+    failureCount,
+    total: tokens.length
+  });
+
+} catch (error) {
+  console.error("❌ Error crítico:", error);
+  return res.status(500).json({ 
+    error: "Error interno del servidor",
+    details: error.message 
+  });
+}
    
        // Responder con resultados
        return res.status(200).json({
