@@ -10,13 +10,12 @@ export default async (req, res) => {
     .replace(/:/g, '-');
 
   // 2. Guardar en Firestore
-  await admin.firestore().collection('pushSubscriptions')
-    .doc(sanitizedEndpoint)
-    .set({
-      endpoint,
-      keys,
-      expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)) // 30 días
-    });
-
-  res.status(200).json({ ok: true });
-};
+app.post('/api/save-subscription', async (req, res) => {
+  try {
+    const subscription = req.body;
+    await admin.firestore().collection('pushSubscriptions').add(subscription);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
