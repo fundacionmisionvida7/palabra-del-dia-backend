@@ -283,14 +283,7 @@ try {
   });
 }
    
-       // Responder con resultados
-       return res.status(200).json({
-         ok: true,
-         successCount,
-         failureCount,
-         total: tokens.length,
-         sampleResults: results.slice(0, 10)
-       });
+
    
      } catch (error) {
        console.error("❌ Error general al procesar notificaciones:", error);
