@@ -173,61 +173,18 @@ const webPushResults = await Promise.all(
     }
     
     // Obtener tokens FCM de la colección fcmTokens
-    const tokensSet = new Set(); // Línea 2
+// ✅ Código corregido:
+const tokensSet = new Set();
 
-    const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get(); // Línea 3
-    fcmTokensSnapshot.forEach(doc => { // Línea 4
-      const data = doc.data(); // Línea 5
-      if (data.token) tokensSet.add(data.token); // Línea 6 ✅
-    }); // Línea 7
+// Solo de fcmTokens
+const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+fcmTokensSnapshot.forEach(doc => {
+  const data = doc.data();
+  if (data.token) tokensSet.add(data.token);
+});
        
-       // Obtener de users
-       const usersSnapshot = await admin.firestore().collection("users").get();
-       usersSnapshot.forEach(doc => {
-         const userData = doc.data();
-         if (userData.fcmToken) tokensSet.add(userData.fcmToken); // ✅
-         if (userData.tokens) userData.tokens.forEach(t => tokensSet.add(t)); // ✅
-       });
-       
-       // 🚨🚨🚨 ELIMINAR DESDE AQUÍ 🚨🚨🚨
-       /* BORRAR TODO ESTO:
-       fcmTokensSnapshot.forEach(doc => { 
-         const data = doc.data();
-         const token = data.token || data.fcmToken || doc.id;
-         if (token && typeof token === 'string' && token.length > 10) {
-           tokens.push(token);
-         }
-       });
-       
-       console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
-       
-       if (tokens.length < 5) {
-         const usersSnapshot = await admin.firestore().collection("users").get();
-         
-         usersSnapshot.forEach(doc => {
-           const userData = doc.data();
-           if (userData.tokens && Array.isArray(userData.tokens)) {
-             userData.tokens.forEach(token => {
-               if (token && typeof token === 'string' && token.length > 10) {
-                 tokens.push(token);
-               }
-             });
-           }
-           
-           if (userData.fcmToken && typeof userData.fcmToken === 'string' && userData.fcmToken.length > 10) {
-             tokens.push(userData.fcmToken);
-           }
-         });
-         
-         tokens = [...new Set(tokens)].filter(t => t.length > 10 && !t.includes(' '));
-         console.log(`📱 Tokens válidos y únicos: ${tokens.length}`);
-       }
-       */
-       // 🚨🚨🚨 HASTA AQUÍ 🚨🚨🚨
-   
-       // ✅✅✅ REEMPLAZAR CON ESTO ✅✅✅
-       // Convertir Set a array y limpiar tokens
-// Convertir a array limpio (comentario - Línea 8)
+
+
 const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
   typeof t === 'string' &&  // Línea 10
   t.length > 10 &&  // Línea 11
