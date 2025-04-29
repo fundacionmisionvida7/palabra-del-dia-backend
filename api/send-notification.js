@@ -140,7 +140,11 @@ for (const sub of webPushTokens) {
     await webPush.sendNotification(sub, JSON.stringify({ title: 'PING', body: '' }));
     validSubscriptions.push(sub);
   } catch (error) {
-    await admin.firestore().collection("pushSubscriptions").doc(sub.endpoint).delete();
+    const sanitizedEndpoint = sub.endpoint
+  .replace(/\//g, '_')  // Reemplazar /
+  .replace(/:/g, '-');  // Reemplazar :
+
+await admin.firestore().collection("pushSubscriptions").doc(sanitizedEndpoint).delete();;
   }
 }
 
@@ -184,7 +188,7 @@ const webPushResults = await Promise.all(validSubscriptions.map)(async sub => {
       if (userData.tokens) userData.tokens.forEach(t => tokensSet.add(t));
     });
     
-    tokensSnapshot.forEach(doc => {
+    fcmTokensSnapshot.forEach(doc => { // <-- Nombre correcto
       const data = doc.data();
       const token = data.token || data.fcmToken || doc.id;
       if (token && typeof token === 'string' && token.length > 10) {
