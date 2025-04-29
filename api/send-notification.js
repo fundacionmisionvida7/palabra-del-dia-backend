@@ -173,14 +173,13 @@ const webPushResults = await Promise.all(
     }
     
     // Obtener tokens FCM de la colección fcmTokens
-    const tokensSet = new Set();
+    const tokensSet = new Set(); // Línea 2
 
-       // Obtener de fcmTokens
-       const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-       fcmTokensSnapshot.forEach(doc => {
-         const data = doc.data();
-         if (data.token) tokensSet.add(data.token); // ✅
-       });
+    const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get(); // Línea 3
+    fcmTokensSnapshot.forEach(doc => { // Línea 4
+      const data = doc.data(); // Línea 5
+      if (data.token) tokensSet.add(data.token); // Línea 6 ✅
+    }); // Línea 7
        
        // Obtener de users
        const usersSnapshot = await admin.firestore().collection("users").get();
@@ -228,19 +227,15 @@ const webPushResults = await Promise.all(
    
        // ✅✅✅ REEMPLAZAR CON ESTO ✅✅✅
        // Convertir Set a array y limpiar tokens
-       const tokens = Array.from(tokensSet).filter(t =>
-        typeof t === 'string' &&
-        t.length > 10 &&
-        !t.includes(' ')
-      );
-      
-      // ── FILTRAR: sólo un token ──
-      if (tokens.length > 1) {
-        tokens.splice(0, tokens.length - 1);
-      }
-      
-      console.log(`📱 Tokens FCM válidos: ${tokens.length}`);
-      
+// Convertir a array limpio (comentario - Línea 8)
+const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
+  typeof t === 'string' &&  // Línea 10
+  t.length > 10 &&  // Línea 11
+  !t.includes(' ') // Línea 12
+); // Línea 13
+       
+       
+       console.log(`📱 Tokens FCM válidos: ${tokens.length}`);
    
        if (tokens.length === 0) {
          return res.status(200).json({ 
