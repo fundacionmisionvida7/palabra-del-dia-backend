@@ -175,65 +175,76 @@ const webPushResults = await Promise.all(
     // Obtener tokens FCM de la colección fcmTokens
     const tokensSet = new Set();
 
-    // Obtener de fcmTokens
-    const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
-    fcmTokensSnapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.token) tokensSet.add(data.token);
-    });
-    
-    // Obtener de users
-    const usersSnapshot = await admin.firestore().collection("users").get();
-    usersSnapshot.forEach(doc => {
-      const userData = doc.data();
-      if (userData.fcmToken) tokensSet.add(userData.fcmToken);
-      if (userData.tokens) userData.tokens.forEach(t => tokensSet.add(t));
-    });
-    
-    fcmTokensSnapshot.forEach(doc => { // <-- Nombre correcto
-      const data = doc.data();
-      const token = data.token || data.fcmToken || doc.id;
-      if (token && typeof token === 'string' && token.length > 10) {
-        tokens.push(token);
-      }
-    });
-    
-    console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
-    
-    // Si no hay suficientes tokens, buscar también en la colección users
-    if (tokens.length < 5) {
-      const usersSnapshot = await admin.firestore().collection("users").get();
-      
-      usersSnapshot.forEach(doc => {
-        const userData = doc.data();
-        if (userData.tokens && Array.isArray(userData.tokens)) {
-          userData.tokens.forEach(token => {
-            if (token && typeof token === 'string' && token.length > 10) {
-              tokens.push(token);
-            }
-          });
-        }
-        
-        if (userData.fcmToken && typeof userData.fcmToken === 'string' && userData.fcmToken.length > 10) {
-          tokens.push(userData.fcmToken);
-        }
-      });
-      
-      // Eliminar duplicados
-      tokens = [...new Set(tokens)].filter(t => t.length > 10 && !t.includes(' '));
-      console.log(`📱 Tokens válidos y únicos: ${tokens.length}`);
-    }
-
-    if (tokens.length === 0) {
-      return res.status(200).json({ 
-        ok: false, 
-        message: "No hay tokens FCM registrados" 
-      });
-    }
-
-       // Dividir los tokens en grupos para evitar sobrecargar Firebase
- // 🚀 Enviar notificaciones en lotes
-console.log("🚀 Enviando notificaciones en lotes...");
+       // Obtener de fcmTokens
+       const fcmTokensSnapshot = await admin.firestore().collection("fcmTokens").get();
+       fcmTokensSnapshot.forEach(doc => {
+         const data = doc.data();
+         if (data.token) tokensSet.add(data.token); // ✅
+       });
+       
+       // Obtener de users
+       const usersSnapshot = await admin.firestore().collection("users").get();
+       usersSnapshot.forEach(doc => {
+         const userData = doc.data();
+         if (userData.fcmToken) tokensSet.add(userData.fcmToken); // ✅
+         if (userData.tokens) userData.tokens.forEach(t => tokensSet.add(t)); // ✅
+       });
+       
+       // 🚨🚨🚨 ELIMINAR DESDE AQUÍ 🚨🚨🚨
+       /* BORRAR TODO ESTO:
+       fcmTokensSnapshot.forEach(doc => { 
+         const data = doc.data();
+         const token = data.token || data.fcmToken || doc.id;
+         if (token && typeof token === 'string' && token.length > 10) {
+           tokens.push(token);
+         }
+       });
+       
+       console.log(`📱 Encontrados ${tokens.length} tokens FCM iniciales`);
+       
+       if (tokens.length < 5) {
+         const usersSnapshot = await admin.firestore().collection("users").get();
+         
+         usersSnapshot.forEach(doc => {
+           const userData = doc.data();
+           if (userData.tokens && Array.isArray(userData.tokens)) {
+             userData.tokens.forEach(token => {
+               if (token && typeof token === 'string' && token.length > 10) {
+                 tokens.push(token);
+               }
+             });
+           }
+           
+           if (userData.fcmToken && typeof userData.fcmToken === 'string' && userData.fcmToken.length > 10) {
+             tokens.push(userData.fcmToken);
+           }
+         });
+         
+         tokens = [...new Set(tokens)].filter(t => t.length > 10 && !t.includes(' '));
+         console.log(`📱 Tokens válidos y únicos: ${tokens.length}`);
+       }
+       */
+       // 🚨🚨🚨 HASTA AQUÍ 🚨🚨🚨
+   
+       // ✅✅✅ REEMPLAZAR CON ESTO ✅✅✅
+       // Convertir Set a array y limpiar tokens
+       const tokens = Array.from(tokensSet).filter(t => 
+         typeof t === 'string' && 
+         t.length > 10 && 
+         !t.includes(' ')
+       );
+       
+       console.log(`📱 Tokens FCM válidos: ${tokens.length}`);
+   
+       if (tokens.length === 0) {
+         return res.status(200).json({ 
+           ok: false, 
+           message: "No hay tokens FCM registrados" 
+         });
+       }
+   
+       // 🚀 Enviar notificaciones en lotes
+       console.log("🚀 Enviando notificaciones en lotes...");
 
 try {
   // Crear mensajes
