@@ -144,22 +144,24 @@ for (const sub of webPushTokens) {
   .replace(/\//g, '_')  // Reemplazar /
   .replace(/:/g, '-');  // Reemplazar :
 
-await admin.firestore().collection("pushSubscriptions").doc(sanitizedEndpoint).delete();;
+await admin.firestore().collection("pushSubscriptions").doc(sanitizedEndpoint).delete();
   }
 }
 
-const webPushResults = await Promise.all(validSubscriptions.map)(async sub => {
-  const payload = JSON.stringify({
-    title,
-    body,
-    icon: '/icon-192x192.png',
-    badge: '/badge.png',
-    data: { url: url || "#" }
-  });
-  return webPush.sendNotification(sub, payload)
-    .then(() => ({ status: 'success' }))
-    .catch(() => ({ status: 'error' }));
-});
+const webPushResults = await Promise.all(
+    validSubscriptions.map(async sub => {
+      const payload = JSON.stringify({
+        title,
+        body,
+        icon: '/icon-192x192.png',
+        badge: '/badge.png',
+        data: { url: url || "#" }
+      });
+      return webPush.sendNotification(sub, payload)
+        .then(() => ({ status: 'success' }))
+        .catch(() => ({ status: 'error' }));
+    })
+  );
           
           const webSuccessCount = webPushResults.filter(r => r.status === 'success').length;
           console.log(`✅ Enviadas ${webSuccessCount} notificaciones web push`);
