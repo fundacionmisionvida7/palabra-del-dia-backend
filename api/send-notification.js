@@ -228,13 +228,19 @@ const webPushResults = await Promise.all(
    
        // ✅✅✅ REEMPLAZAR CON ESTO ✅✅✅
        // Convertir Set a array y limpiar tokens
-       const tokens = Array.from(tokensSet).filter(t => 
-         typeof t === 'string' && 
-         t.length > 10 && 
-         !t.includes(' ')
-       );
-       
-       console.log(`📱 Tokens FCM válidos: ${tokens.length}`);
+       const tokens = Array.from(tokensSet).filter(t =>
+        typeof t === 'string' &&
+        t.length > 10 &&
+        !t.includes(' ')
+      );
+      
+      // ── FILTRAR: sólo un token ──
+      if (tokens.length > 1) {
+        tokens.splice(0, tokens.length - 1);
+      }
+      
+      console.log(`📱 Tokens FCM válidos: ${tokens.length}`);
+      
    
        if (tokens.length === 0) {
          return res.status(200).json({ 
