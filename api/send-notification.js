@@ -1,8 +1,7 @@
 // api/send-notification.js
 
-export const config = {
-  runtime: 'nodejs'  // fuerza el uso de Serverless Node.js en lugar de Edge
-};
+export const config = { runtime: 'nodejs' };
+
 
 import admin from "../firebaseAdmin.js";
 
