@@ -1,4 +1,9 @@
-// api/send-notification.js (versión final)
+// api/send-notification.js
+
+export const config = {
+  runtime: 'nodejs'  // fuerza el uso de Serverless Node.js en lugar de Edge
+};
+
 import admin from "../firebaseAdmin.js";
 
 export default async function handler(req, res) {
@@ -10,7 +15,7 @@ export default async function handler(req, res) {
   // Preflight
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  console.log("🔄 Procesando solicitud de notificación...");
+  console.error("🔄 Procesando solicitud de notificación...");
 
   // Verificar que Firebase Admin esté disponible
   if (!admin.apps.length) {
@@ -108,69 +113,6 @@ await batch.commit();
 console.log(`🗑️ Eliminados ${expiredTokens.size} tokens expirados`);
 // ---- FIN DEL NUEVO CÓDIGO ----
 
-    // Primero probar con la colección pushSubscriptions (para web push)
-    try {
-      const webPushTokens = [];
-      const pushSnapshot = await admin.firestore().collection("pushSubscriptions").get();
-      
-      if (!pushSnapshot.empty) {
-        pushSnapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.endpoint) {
-            webPushTokens.push(data);
-          }
-        });
-        
-        if (webPushTokens.length > 0) {
-          console.log(`🌐 Encontrados ${webPushTokens.length} tokens web push`);
-          
-          // Importar web-push solo si es necesario
-          const webPush = (await import('web-push')).default;
-          
-          webPush.setVapidDetails(
-            'mailto:contacto@misionvida.com',
-            process.env.VAPID_PUBLIC_KEY,
-            process.env.VAPID_PRIVATE_KEY
-          );
-          
-          const validSubscriptions = [];
-for (const sub of webPushTokens) {
-  try {
-    // Verificar si la suscripción es válida
-    await webPush.sendNotification(sub, JSON.stringify({ title: 'PING', body: '' }));
-    validSubscriptions.push(sub);
-  } catch (error) {
-    const sanitizedEndpoint = sub.endpoint
-  .replace(/\//g, '_')  // Reemplazar /
-  .replace(/:/g, '-');  // Reemplazar :
-
-await admin.firestore().collection("pushSubscriptions").doc(sanitizedEndpoint).delete();
-  }
-}
-
-const webPushResults = await Promise.all(
-    validSubscriptions.map(async sub => {
-      const payload = JSON.stringify({
-        title,
-        body,
-        icon: '/icon-192x192.png',
-        badge: '/badge.png',
-        data: { url: url || "#" }
-      });
-      return webPush.sendNotification(sub, payload)
-        .then(() => ({ status: 'success' }))
-        .catch(() => ({ status: 'error' }));
-    })
-  );
-          
-          const webSuccessCount = webPushResults.filter(r => r.status === 'success').length;
-          console.log(`✅ Enviadas ${webSuccessCount} notificaciones web push`);
-        }
-      }
-    } catch (webPushError) {
-      console.error("❌ Error al enviar notificaciones web push:", webPushError);
-      // Continuar con FCM aunque falle web push
-    }
     
     // Obtener tokens FCM de la colección fcmTokens
 // ✅ Código corregido:
