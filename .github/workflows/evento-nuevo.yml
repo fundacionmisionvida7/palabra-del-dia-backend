@@ -2,7 +2,7 @@ name: Evento Nuevo
 
 on:
   schedule:
-    - cron: '0 20 * * *'  # Todos los días a las 20:00 UTC → 17:00 Argentina
+    - cron: '0 7 * * *'  # Todos los días a las 07:00 UTC → 07:00 Argentina
   workflow_dispatch:
 
 jobs:
