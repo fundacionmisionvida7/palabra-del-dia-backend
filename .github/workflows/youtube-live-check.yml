@@ -23,7 +23,7 @@ jobs:
           
           if [ "$LIVE_COUNT" -gt 0 ]; then
             echo "¡Hay transmisión en vivo! Enviando notificación..."
-            curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
+            curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
               -H "Content-Type: application/json" \
               --retry 3 \
               --retry-delay 5 \
