@@ -2,7 +2,7 @@ name: Versículo del Día
 
 on:
   schedule:
-    - cron: '0 14 * * *'  # 14:00 UTC → 11:00 Argentina
+    - cron: '0 7 * * *'  # 7:00 UTC → 07:00 Argentina
   workflow_dispatch:
 
 jobs:
