@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Enviar notificación del evento
         run: |
-          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=event" \
+          curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=event" \
             -H "Content-Type: application/json" \
             --retry 3 \
             --retry-delay 5 \
