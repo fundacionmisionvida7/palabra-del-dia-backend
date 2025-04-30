@@ -11,7 +11,8 @@ jobs:
     steps:
       - name: Enviar notificación diaria
         run: |
-          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=daily" \
+          curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=daily" \
+
             -H "Content-Type: application/json" \
             --retry 3 \
             --retry-delay 5 \
