@@ -1,23 +1,24 @@
 // api/eventos-images.js
-import { bucket } from '../firebaseAdmin.js';
+import { storage } from '../firebase-config.js';
 
-export default async function handler(req, res) {
+export default async (req, res) => {
   try {
-    const [files] = await bucket.getFiles({ prefix: 'eventos/EventosNuevos/' });
-
-    // Por cada archivo, genera un URL firmado válido por 1 día:
-    const urlPromises = files.map(file =>
-      file.getSignedUrl({
-        action: 'read',
-        expires: Date.now() + 24 * 60 * 60 * 1000
-      })
+    const ref = storage.ref('eventos');
+    const result = await ref.listAll();
+    
+    const urls = await Promise.all(
+      result.items.map(item => item.getDownloadURL())
     );
-    const signedUrlArrays = await Promise.all(urlPromises);
-    const urls = signedUrlArrays.map(arr => arr[0]); // getSignedUrl devuelve [url]
 
-    res.status(200).json({ urls });
+    res.status(200).json({
+      success: true,
+      urls: urls,
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('Error listando Storage (eventos):', error);
-    res.status(500).json({ error: 'No se pudo leer Storage' });
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
-}
+};
