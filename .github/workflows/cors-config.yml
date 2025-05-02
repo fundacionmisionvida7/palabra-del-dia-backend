@@ -1,0 +1,17 @@
+name: Configure CORS
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set CORS headers
+        uses: fantactuka/s3-website-cors-action@v1
+        with:
+          bucket-url: ${{ secrets.AWS_BUCKET_URL }} # O tu proveedor
+          cors-rules: |
+            {
+              "AllowedHeaders": ["*"],
+              "AllowedMethods": ["GET"],
+              "AllowedOrigins": ["*"],
+              "ExposeHeaders": []
+            }
