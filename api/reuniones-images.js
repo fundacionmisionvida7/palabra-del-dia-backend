@@ -1,5 +1,5 @@
 // api/reuniones-images.js
-import { bucket } from './firebaseAdmin.js';
+import { bucket } from '../firebaseAdmin.js';
 
 export default async function handler(req, res) {
   try {
