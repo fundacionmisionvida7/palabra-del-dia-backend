@@ -1,15 +1,14 @@
 // api/reuniones-images.js
-import { db } from './firebaseAdmin';
+import { bucket } from './firebaseAdmin';
 
 export default async function handler(req, res) {
   try {
-    const snapshot = await db.collection('reuniones').get();
-    const urls = snapshot.docs
-      .map(doc => doc.data().imagenUrl)
-      .filter(url => typeof url === 'string');
+    // Ajusta el prefijo según tu estructura de carpetas
+    const [files] = await bucket.getFiles({ prefix: 'reuniones/' });
+    const urls = files.map(file => file.publicUrl());
     res.status(200).json({ urls });
   } catch (error) {
-    console.error('Error al obtener imágenes de reuniones:', error);
-    res.status(500).json({ error: 'Error interno al leer Firestore' });
+    console.error('Error listando Storage (reuniones):', error);
+    res.status(500).json({ error: 'No se pudo leer Storage' });
   }
 }
