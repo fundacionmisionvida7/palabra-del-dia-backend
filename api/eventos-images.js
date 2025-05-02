@@ -1,5 +1,5 @@
 // api/eventos-images.js
-import { bucket } from './firebaseAdmin';
+import { bucket } from '../firebaseAdmin.js';
 
 export default async function handler(req, res) {
   try {
