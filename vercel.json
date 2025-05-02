@@ -5,19 +5,14 @@
       "src": "api/**/*.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": "firebase-service-account.json",
-        "functions": {
-          "api/send-notification.js": {
-            "maxDuration": 30
-          }
-        }
+        "includeFiles": "firebaseAdmin.js"
       }
     }
   ],
   "routes": [
     {
       "src": "/api/subscribe",
-      "dest": "api/subscribe.js",
+      "dest": "/api/subscribe.js",
       "methods": ["POST", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -27,7 +22,7 @@
     },
     {
       "src": "/api/devotional",
-      "dest": "api/devotional.js",
+      "dest": "/api/devotional.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -37,7 +32,7 @@
     },
     {
       "src": "/api/send-daily",
-      "dest": "api/send-daily.js",
+      "dest": "/api/send-daily.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -47,7 +42,7 @@
     },
     {
       "src": "/api/save-token",
-      "dest": "api/save-token.js",
+      "dest": "/api/save-token.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -57,7 +52,7 @@
     },
     {
       "src": "/api/send-notification",
-      "dest": "api/send-notification.js",
+      "dest": "/api/send-notification.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -67,7 +62,7 @@
     },
     {
       "src": "/api/eventos-images",
-      "dest": "api/eventos-images.js",
+      "dest": "/api/eventos-images.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
@@ -77,18 +72,12 @@
     },
     {
       "src": "/api/reuniones-images",
-      "dest": "api/reuniones-images.js",
+      "dest": "/api/reuniones-images.js",
       "methods": ["GET", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/(.*\\.(ico|png|jpg|jpeg|svg|css|js|html))",
-      "headers": {
-        "Cache-Control": "public, max-age=31536000, immutable"
       }
     },
     {
