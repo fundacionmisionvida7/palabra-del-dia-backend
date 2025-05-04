@@ -10,76 +10,29 @@
     }
   ],
   "routes": [
+    // Controlador global para preflight CORS en todas las rutas API
     {
-      "src": "/api/subscribe",
-      "dest": "/api/subscribe.js",
-      "methods": ["POST", "OPTIONS"],
+      "src": "/api/(.*)",
+      "methods": ["OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      },
+      "status": 204
     },
+    // Endpoints de API con CORS habilitado
     {
-      "src": "/api/devotional",
-      "dest": "/api/devotional.js",
-      "methods": ["GET", "OPTIONS"],
+      "src": "/api/(subscribe|devotional|send-daily|save-token|send-notification|eventos-images|reuniones-images)$",
+      "dest": "/api/$1.js",
+      "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
       "headers": {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
       }
     },
-    {
-      "src": "/api/send-daily",
-      "dest": "/api/send-daily.js",
-      "methods": ["GET", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/save-token",
-      "dest": "/api/save-token.js",
-      "methods": ["GET", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/send-notification",
-      "dest": "/api/send-notification.js",
-      "methods": ["GET", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/eventos-images",
-      "dest": "/api/eventos-images.js",
-      "methods": ["GET", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
-    {
-      "src": "/api/reuniones-images",
-      "dest": "/api/reuniones-images.js",
-      "methods": ["GET", "OPTIONS"],
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
-      }
-    },
+    // Fallback SPA y assets estáticos
     {
       "src": "/(.*)",
       "dest": "/index.html",
