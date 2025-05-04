@@ -10,7 +10,7 @@
     }
   ],
   "routes": [
-    // Controlador global para preflight CORS en todas las rutas API
+    
     {
       "src": "/api/(.*)",
       "methods": ["OPTIONS"],
@@ -21,7 +21,7 @@
       },
       "status": 204
     },
-    // Endpoints de API con CORS habilitado
+    
     {
       "src": "/api/(subscribe|devotional|send-daily|save-token|send-notification|eventos-images|reuniones-images)$",
       "dest": "/api/$1.js",
@@ -32,7 +32,7 @@
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
       }
     },
-    // Fallback SPA y assets estáticos
+   
     {
       "src": "/(.*)",
       "dest": "/index.html",
