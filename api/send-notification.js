@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       };
     } else if (type === "verse") {
       notificationData = {
-        title: "¡Nuevo versículo del día!",
+        title: "🙏 ¡Nuevo versículo del día!",
         body: "No te lo pierdas, ya está disponible",
         url: "#versiculo",    // Cambiado a hash
         type: "verse"         // ← incluimos el type aquí
@@ -64,12 +64,14 @@ export default async function handler(req, res) {
         title: "¡Nuevo evento!",
         body: "¡Ya está disponible el nuevo evento para ver!",
         url: "#eventos" // Cambiado a hash
+        type: "event"         // ← incluimos el type aquí
       };
     } else if (type === "live") {
       notificationData = {
-        title: "¡Estamos en vivo!",
+        title: "🎥¡Estamos en vivo!",
         body: "Únete a la transmisión del culto ahora mismo.",
         url: "#live" // ✅ Usar hash
+        type: "live"         // ← incluimos el type aquí
       };
     } else if (type === "test") {  // <<< Llave correctamente cerrada
       notificationData = {
