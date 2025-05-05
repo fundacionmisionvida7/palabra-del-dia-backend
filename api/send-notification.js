@@ -56,7 +56,8 @@ export default async function handler(req, res) {
       notificationData = {
         title: "¡Nuevo versículo del día!",
         body: "No te lo pierdas, ya está disponible",
-        url: "#versiculo" // Cambiado a hash
+        url: "#versiculo",    // Cambiado a hash
+        type: "verse"         // ← incluimos el type aquí
       };
     } else if (type === "event") {
       notificationData = {
