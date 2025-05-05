@@ -60,18 +60,18 @@ export default async function handler(req, res) {
         type: "verse"         // ← incluimos el type aquí
       };
     } else if (type === "event") {
-      notificationData = {
-        title: "¡Nuevo evento!",
-        body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "#eventos" // Cambiado a hash
-        type: "event"         // ← incluimos el type aquí
+        notificationData = {
+            title: "¡Nuevo evento!",
+            body: "¡Ya está disponible el nuevo evento para ver!",
+            url: "#eventos",      // ← coma añadida
+            type: "event"         // ← type ahora va bien      
       };
     } else if (type === "live") {
-      notificationData = {
-        title: "🎥¡Estamos en vivo!",
-        body: "Únete a la transmisión del culto ahora mismo.",
-        url: "#live" // ✅ Usar hash
-        type: "live"         // ← incluimos el type aquí
+        notificationData = {
+            title: "🎥¡Estamos en vivo!",
+            body: "Únete a la transmisión del culto ahora mismo.",
+            url: "#live",         // ← coma añadida
+            type: "live"          // ← type correcto
       };
     } else if (type === "test") {  // <<< Llave correctamente cerrada
       notificationData = {
