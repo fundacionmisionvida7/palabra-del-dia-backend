@@ -57,15 +57,16 @@ export default async function handler(req, res) {
         type: "daily"
       };
     } else if (type === "verse") {
-      // 1) Leer JSON desde /data/versiculos.json usando import.meta.url
+      // 1) Leer JSON desde public/data/versiculos.json usando import.meta.url
       let list;
       try {
-        const jsonUrl = new URL("../data/versiculos.json", import.meta.url);
+        // Desde api/send-notification.js, subimos un nivel a /api, y luego accedemos a /public/data
+        const jsonUrl = new URL("../public/data/versiculos.json", import.meta.url);
         const file    = await fs.readFile(jsonUrl, "utf-8");
         list = JSON.parse(file).versiculos;
       } catch (err) {
-        console.error("❌ No pude leer data/versiculos.json:", err);
-        return res.status(500).json({ error: "Error al leer versiculos.json" });
+        console.error("❌ No pude leer public/data/versiculos.json:", err);
+        return res.status(500).json({ error: "Error al leer public/data/versiculos.json" });
       }
     
       // 2) Elegir un versículo al azar
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
         type: "verse",
         verseText: verse.texto,
         verseReference: verse.referencia
-      };    
+      };  
     } else if (type === "event") {
       notificationData = {
         title: "🎉 ¡Nuevo evento!",
