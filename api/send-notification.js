@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       };
     } else if (type === "verse") {
            // 1) Leer JSON y elegir aleatorio
-            const json = JSON.parse(await fs.readFile(new URL("../public/data/versiculos.json", import.meta.url), "utf-8"));
+            const json = JSON.parse(await fs.readFile(new URL("../data/versiculos.json", import.meta.url), "utf-8"));
             const list = json.versiculos;
             const idx  = Math.floor(Math.random() * list.length);
             const verse = list[idx];
