@@ -5,6 +5,7 @@ import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs"; // para leer tu JSON localmente
 
 
+
 export default async function handler(req, res) {
   // Permitir CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -57,22 +58,23 @@ export default async function handler(req, res) {
         type: "daily"
       };
     } else if (type === "verse") {
-      // 1) Leer JSON desde public/data/versiculos.json usando import.meta.url
+      // 1) Leer JSON desde api/data/versiculos.json
       let list;
       try {
-        // Desde api/send-notification.js, subimos un nivel a /api, y luego accedemos a /public/data
-        const jsonUrl = new URL("../public/data/versiculos.json", import.meta.url);
+        // import.meta.url apunta a .../api/send-notification.js
+        const jsonUrl = new URL("./data/versiculos.json", import.meta.url);
         const file    = await fs.readFile(jsonUrl, "utf-8");
         list = JSON.parse(file).versiculos;
       } catch (err) {
-        console.error("❌ No pude leer public/data/versiculos.json:", err);
-        return res.status(500).json({ error: "Error al leer public/data/versiculos.json" });
+        console.error("❌ No pude leer api/data/versiculos.json:", err);
+        return res.status(500).json({ error: "Error al leer versiculos.json" });
       }
     
       // 2) Elegir un versículo al azar
       const idx   = Math.floor(Math.random() * list.length);
       const verse = list[idx];
     
+      // 3) Montar notificationData
       notificationData = {
         title: "🙏 ¡Nuevo versículo del día!",
         body: verse.texto,
@@ -80,7 +82,8 @@ export default async function handler(req, res) {
         type: "verse",
         verseText: verse.texto,
         verseReference: verse.referencia
-      };  
+      };
+    
     } else if (type === "event") {
       notificationData = {
         title: "🎉 ¡Nuevo evento!",
