@@ -1,6 +1,7 @@
 // api/send-notification.js
 
 import admin from "../firebaseAdmin.js";
+import fs from "fs/promises"; // para leer tu JSON localmente
 
 export default async function handler(req, res) {
   // Permitir CORS
@@ -53,12 +54,20 @@ export default async function handler(req, res) {
         url: "/" // Ruta específica
       };
     } else if (type === "verse") {
-      notificationData = {
-        title: "🙏 ¡Nuevo versículo del día!",
-        body: "No te lo pierdas, ya está disponible",
-        url: "#versiculo",    // Cambiado a hash
-        type: "verse"         // ← incluimos el type aquí
-      };
+           // 1) Leer JSON y elegir aleatorio
+            const json = JSON.parse(await fs.readFile(new URL("../public/data/versiculos.json", import.meta.url), "utf-8"));
+            const list = json.versiculos;
+            const idx  = Math.floor(Math.random() * list.length);
+            const verse = list[idx];
+      
+            notificationData = {
+              title: "🙏¡Nuevo versículo del día!",
+              body: verse.texto,   // mostramos el texto en la notificación
+              url: "#versiculo",
+              type: "verse",
+              verseText: verse.texto,
+              verseReference: verse.referencia
+            };
     } else if (type === "event") {
         notificationData = {
             title: "¡Nuevo evento!",
@@ -149,10 +158,12 @@ try {
   // Crear mensajes
   const messages = tokens.map(token => ({
     token,
-    notification: { title, body },
+    notification: { title: notificationData.title, body: notificationData.body },
     data: {
-      url: url || "#",
-      type: notificationData.type || 'general',
+      url: notificationData.url,
+      type: notificationData.type,
+      verseText: notificationData.verseText || "",
+      verseReference: notificationData.verseReference || "",
       timestamp: Date.now().toString()
     },
     android: { 
