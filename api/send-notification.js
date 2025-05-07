@@ -1,7 +1,9 @@
 // api/send-notification.js
 
 import admin from "../firebaseAdmin.js";
-import fs from "fs/promises"; // para leer tu JSON localmente
+// import fs from "fs/promises"; // para leer tu JSON localmente
+import { promises as fs } from "fs"; // para leer tu JSON localmente
+
 
 export default async function handler(req, res) {
   // Permitir CORS
@@ -55,21 +57,21 @@ export default async function handler(req, res) {
         type: "daily"
       };
     } else if (type === "verse") {
-      // 1) Leer JSON desde /data/versiculos.json
-      const filePath = path.join(process.cwd(), "data", "versiculos.json");
+      // 1) Leer JSON desde /data/versiculos.json usando import.meta.url
       let list;
       try {
-        const file = await fs.readFile(filePath, "utf-8");
+        const jsonUrl = new URL("../data/versiculos.json", import.meta.url);
+        const file    = await fs.readFile(jsonUrl, "utf-8");
         list = JSON.parse(file).versiculos;
       } catch (err) {
         console.error("❌ No pude leer data/versiculos.json:", err);
         return res.status(500).json({ error: "Error al leer versiculos.json" });
       }
-
+    
       // 2) Elegir un versículo al azar
       const idx   = Math.floor(Math.random() * list.length);
       const verse = list[idx];
-
+    
       notificationData = {
         title: "🙏 ¡Nuevo versículo del día!",
         body: verse.texto,
@@ -77,7 +79,7 @@ export default async function handler(req, res) {
         type: "verse",
         verseText: verse.texto,
         verseReference: verse.referencia
-      };
+      };    
     } else if (type === "event") {
       notificationData = {
         title: "🎉 ¡Nuevo evento!",
