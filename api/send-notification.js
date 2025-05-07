@@ -114,9 +114,28 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { title, body, url } = notificationData;
 
-  // Validar campos
+  // Desestructuramos los campos básicos
+const { title, body, url } = notificationData;
+
+// —— AÑADE AQUÍ ——
+// Construimos un objeto dataPayload que solo contenga strings:
+const dataPayload = {
+  url: `${url}`,                   // siempre string
+  type: `${notificationData.type}`,// siempre string
+  timestamp: Date.now().toString() // string
+};
+
+// Si tenemos versículo, lo añadimos como string
+if (notificationData.verseText) {
+  dataPayload.verseText = `${notificationData.verseText}`;
+}
+if (notificationData.verseReference) {
+  dataPayload.verseReference = `${notificationData.verseReference}`;
+}
+// —— FIN DEL BLOQUE ——
+
+// Validar campos
   if (!title || !body) {
     return res.status(400).json({ 
       error: "Faltan campos: title y body son obligatorios" 
@@ -175,33 +194,22 @@ try {
   // Crear mensajes
   const messages = tokens.map(token => ({
     token,
-    notification: {
-      title: notificationData.title,
-      body:  notificationData.body
+    notification: { title, body },
+    data: dataPayload,
+    android: {
+      notification: {
+        icon: 'ic_notification',
+        color: '#F57C00',
+        sound: 'default'
+      }
     },
-    data: {
-      url:       notificationData.url,
-      type:      notificationData.type,        // muy importante
-      verseText: notificationData.verseText,   // para que el SW lo almacene
-      verseReference: notificationData.verseReference
-    },
-    android: { 
-      notification: { 
-        icon: 'ic_notification', 
-        color: '#F57C00', 
-        sound: 'default' 
-      } 
-    },
-    apns: { 
-      headers: { 'apns-priority': '10' }, 
-      payload: { 
-        aps: { 
-          sound: 'default',
-          category: 'DEVOTIONAL'
-        } 
-      } 
+    apns: {
+      headers: { 'apns-priority': '10' },
+      payload: { aps: { sound: 'default', category: 'DEVOTIONAL' } }
     }
   }));
+
+  
 
   // Dividir en lotes de 500
   const chunks = [];
