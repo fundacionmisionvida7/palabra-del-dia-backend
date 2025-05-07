@@ -38,7 +38,7 @@ export default async function handler(req, res) {
 
   // Manejar tanto POST como GET
   let notificationData = {};
-  
+
   if (req.method === "POST") {
     console.log("📩 Solicitud POST recibida");
     notificationData = req.body || {};
@@ -46,51 +46,62 @@ export default async function handler(req, res) {
     console.log("📩 Solicitud GET recibida");
     const { type } = req.query;
     console.log(`🔔 Tipo de notificación: ${type}`);
-    
+
     if (type === "daily") {
       notificationData = {
         title: "📖 Palabra del Día",
         body: "¡Tu devocional de hoy ya está disponible!",
-        url: "/" // Ruta específica
+        url: "/",
+        type: "daily"
       };
     } else if (type === "verse") {
-           // 1) Leer JSON y elegir aleatorio
-            const json = JSON.parse(await fs.readFile(new URL("../data/versiculos.json", import.meta.url), "utf-8"));
-            const list = json.versiculos;
-            const idx  = Math.floor(Math.random() * list.length);
-            const verse = list[idx];
-      
-            notificationData = {
-              title: "🙏¡Nuevo versículo del día!",
-              body: verse.texto,   // mostramos el texto en la notificación
-              url: "#versiculo",
-              type: "verse",
-              verseText: verse.texto,
-              verseReference: verse.referencia
-            };
+      // 1) Leer JSON desde /data/versiculos.json
+      const filePath = path.join(process.cwd(), "data", "versiculos.json");
+      let list;
+      try {
+        const file = await fs.readFile(filePath, "utf-8");
+        list = JSON.parse(file).versiculos;
+      } catch (err) {
+        console.error("❌ No pude leer data/versiculos.json:", err);
+        return res.status(500).json({ error: "Error al leer versiculos.json" });
+      }
+
+      // 2) Elegir un versículo al azar
+      const idx   = Math.floor(Math.random() * list.length);
+      const verse = list[idx];
+
+      notificationData = {
+        title: "🙏 ¡Nuevo versículo del día!",
+        body: verse.texto,
+        url: "#versiculo",
+        type: "verse",
+        verseText: verse.texto,
+        verseReference: verse.referencia
+      };
     } else if (type === "event") {
-        notificationData = {
-            title: "¡Nuevo evento!",
-            body: "¡Ya está disponible el nuevo evento para ver!",
-            url: "#eventos",      // ← coma añadida
-            type: "event"         // ← type ahora va bien      
+      notificationData = {
+        title: "🎉 ¡Nuevo evento!",
+        body: "¡Ya está disponible el nuevo evento para ver!",
+        url: "#eventos",
+        type: "event"
       };
     } else if (type === "live") {
-        notificationData = {
-            title: "🎥¡Estamos en vivo!",
-            body: "Únete a la transmisión del culto ahora mismo.",
-            url: "#live",         // ← coma añadida
-            type: "live"          // ← type correcto
+      notificationData = {
+        title: "🎥 ¡Estamos en vivo!",
+        body: "Únete a la transmisión del culto ahora mismo.",
+        url: "#live",
+        type: "live"
       };
-    } else if (type === "test") {  // <<< Llave correctamente cerrada
+    } else if (type === "test") {
       notificationData = {
         title: "🧪 Notificación de prueba",
-        body: "Esta es una notificación de prueba (" + new Date().toLocaleString() + ")",
-        url: "/"
+        body: `Esta es una notificación de prueba (${new Date().toLocaleString()})`,
+        url: "/",
+        type: "test"
       };
     } else {
-      return res.status(400).json({ 
-        error: "Tipo de notificación no válido. Use 'daily', 'verse', 'event' o 'test'" 
+      return res.status(400).json({
+        error: "Tipo de notificación no válido. Usa 'daily', 'verse', 'event', 'live' o 'test'"
       });
     }
   } else {
@@ -158,13 +169,15 @@ try {
   // Crear mensajes
   const messages = tokens.map(token => ({
     token,
-    notification: { title: notificationData.title, body: notificationData.body },
+    notification: {
+      title: notificationData.title,
+      body:  notificationData.body
+    },
     data: {
-      url: notificationData.url,
-      type: notificationData.type,
-      verseText: notificationData.verseText || "",
-      verseReference: notificationData.verseReference || "",
-      timestamp: Date.now().toString()
+      url:       notificationData.url,
+      type:      notificationData.type,        // muy importante
+      verseText: notificationData.verseText,   // para que el SW lo almacene
+      verseReference: notificationData.verseReference
     },
     android: { 
       notification: { 
