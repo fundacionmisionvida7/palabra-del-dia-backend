@@ -40,28 +40,30 @@ export default async function handler(req, res) {
   }
 
   // Manejar tanto POST como GET
-  let notificationData = {};
+   let notificationData = {};
 
   if (req.method === "POST") {
-    console.log("📩 Solicitud POST recibida");
     notificationData = req.body || {};
+
   } else if (req.method === "GET") {
-    console.log("📩 Solicitud GET recibida");
+    // ─────────── IMPORTANTE ───────────
+    // Aquí extrajimos `type` de los query params
     const { type } = req.query;
+    console.log("📩 Solicitud GET recibida");
     console.log(`🔔 Tipo de notificación: ${type}`);
 
     if (type === "daily") {
       notificationData = {
         title: "📖 Palabra del Día",
-        body: "¡Tu devocional de hoy ya está disponible!",
-        url: "/",
-        type: "daily"
+        body:  "¡Tu devocional de hoy ya está disponible!",
+        url:   "/",
+        type:  "daily"
       };
+
     } else if (type === "verse") {
-      // 1) Leer JSON desde api/data/versiculos.json
+      // Lectura JSON desde api/data/versiculos.json
       let list;
       try {
-        // import.meta.url apunta a .../api/send-notification.js
         const jsonUrl = new URL("./data/versiculos.json", import.meta.url);
         const file    = await fs.readFile(jsonUrl, "utf-8");
         list = JSON.parse(file).versiculos;
@@ -69,72 +71,69 @@ export default async function handler(req, res) {
         console.error("❌ No pude leer api/data/versiculos.json:", err);
         return res.status(500).json({ error: "Error al leer versiculos.json" });
       }
-    
-      // 2) Elegir un versículo al azar
       const idx   = Math.floor(Math.random() * list.length);
       const verse = list[idx];
-    
-      // 3) Montar notificationData
+
       notificationData = {
-        title: "🙏 ¡Nuevo versículo del día!",
-        body: verse.texto,
-        url: "#versiculo",
-        type: "verse",
-        verseText: verse.texto,
+        title:          "🙏 ¡Nuevo versículo del día!",
+        body:           verse.texto,
+        url:            "#versiculo",
+        type:           "verse",
+        verseText:      verse.texto,
         verseReference: verse.referencia
       };
-    
+
     } else if (type === "event") {
       notificationData = {
         title: "🎉 ¡Nuevo evento!",
-        body: "¡Ya está disponible el nuevo evento para ver!",
-        url: "#eventos",
-        type: "event"
+        body:  "¡Ya está disponible el nuevo evento para ver!",
+        url:   "#eventos",
+        type:  "event"
       };
+
     } else if (type === "live") {
       notificationData = {
         title: "🎥 ¡Estamos en vivo!",
-        body: "Únete a la transmisión del culto ahora mismo.",
-        url: "#live",
-        type: "live"
+        body:  "Únete a la transmisión del culto ahora mismo.",
+        url:   "#live",
+        type:  "live"
       };
+
     } else if (type === "test") {
       notificationData = {
         title: "🧪 Notificación de prueba",
-        body: `Esta es una notificación de prueba (${new Date().toLocaleString()})`,
-        url: "/",
-        type: "test"
+        body:  `Esta es una notificación de prueba (${new Date().toLocaleString()})`,
+        url:   "/",
+        type:  "test"
       };
+
     } else {
       return res.status(400).json({
         error: "Tipo de notificación no válido. Usa 'daily', 'verse', 'event', 'live' o 'test'"
       });
     }
+
   } else {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
 
-
 // Después de haber calculado notificationData:
-const { title, body, url, type } = notificationData;
+  const { title, body, url, type: notifType } = notificationData;
 
 // —— AÑADE AQUÍ ——
 // Construimos dataPayload SÓLO con strings:
-const dataPayload = {
-  url:       String(url),
-  type:      String(type),                // ← Esto tiene que valer "event" para eventos
-  timestamp: Date.now().toString()
-};
+  const dataPayload = {
+    url:       String(url),
+    type:      String(notifType),
+    timestamp: Date.now().toString()
+  };
+  if (notificationData.verseText) {
+    dataPayload.verseText = String(notificationData.verseText);
+    dataPayload.verseReference = String(notificationData.verseReference);
+  }
 
-// Si tenemos versículo, lo añadimos como string
-// Para verse añade verseText y verseReference...
-if (notificationData.verseText) {
-  dataPayload.verseText = String(notificationData.verseText);
-}
-if (notificationData.verseReference) {
-  dataPayload.verseReference = String(notificationData.verseReference);
-}
+
 // —— FIN DEL BLOQUE ——
 
 // Validar campos
@@ -193,14 +192,14 @@ const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
        console.log("🚀 Enviando notificaciones en lotes...");
 
 try {
-  // Crear mensajes
+  // Creación de mensajes FCM
   const messages = tokens.map(token => ({
-  token,
-  notification: { title, body },
-  data:         dataPayload,
-  android: { /* … */ },
-  apns:    { /* … */ }
-}));
+    token,
+    notification: { title, body },
+    data:         dataPayload,
+    android:      { notification: { icon: "ic_notification", color: "#F57C00", sound: "default" } },
+    apns:         { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", category: "DEVOTIONAL" } } }
+  }));
 
   
 
