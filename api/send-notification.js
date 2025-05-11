@@ -115,8 +115,9 @@ export default async function handler(req, res) {
   }
 
 
-  // Desestructuramos los campos básicos
-const { title, body, url } = notificationData;
+
+// Después de haber calculado notificationData:
+const { title, body, url, type } = notificationData;
 
 // —— AÑADE AQUÍ ——
 // Construimos dataPayload SÓLO con strings:
