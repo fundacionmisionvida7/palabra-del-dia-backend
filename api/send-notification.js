@@ -119,19 +119,20 @@ export default async function handler(req, res) {
 const { title, body, url } = notificationData;
 
 // —— AÑADE AQUÍ ——
-// Construimos un objeto dataPayload que solo contenga strings:
+// Construimos dataPayload SÓLO con strings:
 const dataPayload = {
-  url: `${url}`,                   // siempre string
-  type: `${notificationData.type}`,// siempre string
-  timestamp: Date.now().toString() // string
+  url:       String(url),
+  type:      String(type),                // ← Esto tiene que valer "event" para eventos
+  timestamp: Date.now().toString()
 };
 
 // Si tenemos versículo, lo añadimos como string
+// Para verse añade verseText y verseReference...
 if (notificationData.verseText) {
-  dataPayload.verseText = `${notificationData.verseText}`;
+  dataPayload.verseText = String(notificationData.verseText);
 }
 if (notificationData.verseReference) {
-  dataPayload.verseReference = `${notificationData.verseReference}`;
+  dataPayload.verseReference = String(notificationData.verseReference);
 }
 // —— FIN DEL BLOQUE ——
 
@@ -193,21 +194,12 @@ const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
 try {
   // Crear mensajes
   const messages = tokens.map(token => ({
-    token,
-    notification: { title, body },
-    data: dataPayload,
-    android: {
-      notification: {
-        icon: 'ic_notification',
-        color: '#F57C00',
-        sound: 'default'
-      }
-    },
-    apns: {
-      headers: { 'apns-priority': '10' },
-      payload: { aps: { sound: 'default', category: 'DEVOTIONAL' } }
-    }
-  }));
+  token,
+  notification: { title, body },
+  data:         dataPayload,
+  android: { /* … */ },
+  apns:    { /* … */ }
+}));
 
   
 
