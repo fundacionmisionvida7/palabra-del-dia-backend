@@ -69,20 +69,20 @@ export default async function handler(req, res) {
   if (verseText)      dataPayload.verseText      = verseText;
   if (verseReference) dataPayload.verseReference = verseReference;
 
-  const payload = {
-    notification: { title, body },
-    data:         dataPayload,
-    android:      { notification: { icon: "ic_notification", color: "#F57C00", sound: "default" } },
-    apns:         { payload: { aps: { alert: { title, body }, sound: "default" } } }
-  };
+// … ya tienes title, body, dataPayload …
+const payload = {
+  notification: { title, body },
+  data:         dataPayload
+};
 
-  // 3) Enviar al topic indicado (topic === type)
-  try {
-    const resp = await admin.messaging().sendToTopic(type, payload);
-    console.log(`✅ Notificación tipo="${type}" enviada al topic "${type}"`, resp);
-    return res.status(200).json({ ok: true, resp });
-  } catch (err) {
-    console.error("❌ Error enviando a topic:", err);
-    return res.status(500).json({ error: err.message });
-  }
+try {
+  // Enviar al topic dinámico
+  const resp = await admin.messaging().sendToTopic(type, payload);
+  console.log(`✅ Notificación tipo="${type}" enviada al topic "${type}"`, resp);
+  return res.status(200).json({ ok: true, resp });
+} catch (err) {
+  console.error("❌ Error enviando a topic:", err);
+  return res.status(500).json({ error: err.message });
+}
+
 }
