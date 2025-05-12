@@ -155,18 +155,19 @@ try {
   const topic = topicMap[notificationData.type];
   if (!topic) throw new Error("Tipo no válido para topic");
 
-  // Payload *solo* data:
-  const payload = {
-    data: {
-      title,
-      body,
-      ...dataPayload
-    }
-  };
+const message = {
+  topic,           // tu topic: "daily", "verse", "event", "live", etc.
+  data: payload.data,
+  android: payload.android,
+  apns:    payload.apns
+};
 
-  console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-  const response = await admin.messaging().sendToTopic(topic, payload);
-  console.log(`✅ Enviado al topic "${topic}"`, response);
+console.log(`🚀 Enviando notificación al topic "${topic}"…`);
+const response = await admin.messaging().send(message);
+console.log(`✅ Enviado al topic "${topic}"`, response);
+
+
+
 
   return res.status(200).json({ ok: true, topic, response });
 } catch (err) {
