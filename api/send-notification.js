@@ -148,27 +148,38 @@ export default async function handler(req, res) {
   // ——————————————————————————————————
   
 
-// … después de definir title, body, dataPayload, etc.
-
-  // … tras haber construido `notificationData` y `dataPayload` …
-
   try {
-    // 1) Mapea el tipo a topic
-    const topicMap = { daily:"daily", verse:"verse", event:"event", live:"live", test:"test" };
+    // 1) Mapea el type al nombre de topic
+    const topicMap = {
+      daily: "daily",
+      verse: "verse",
+      event: "event",
+      live:  "live",
+      test:  "test"
+    };
     const topic = topicMap[notificationData.type];
-    if (!topic) return res.status(400).json({ error:"Tipo no válido para topic" });
+    if (!topic) {
+      return res
+        .status(400)
+        .json({ error: `Tipo no válido para topic: ${notificationData.type}` });
+    }
 
-    // 2) Prepara el mensaje para la API v1
+    // 2) Construye el payload de la notificación
     const messagePayload = {
-      topic,                     // sin "/topics/"
+      topic,  // sin "/topics/"
       data: {
         title,
         body,
-        ...dataPayload
+        url:       dataPayload.url,
+        type:      dataPayload.type,
+        timestamp: dataPayload.timestamp,
+        // campos opcionales:
+        ...(dataPayload.verseText     && { verseText: dataPayload.verseText }),
+        ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
       },
       android: {
         notification: {
-          icon: 'ic_notification',
+          icon:  'ic_notification',
           color: '#F57C00',
           sound: 'default'
         }
@@ -178,20 +189,21 @@ export default async function handler(req, res) {
           aps: {
             alert: { title, body },
             sound: 'default',
-            category: 'YOUR_CATEGORY'
+            category: 'DEVOTIONAL'
           }
         }
       }
     };
 
     console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-    // 3) Envía usando la API v1
-    const response = await admin.messaging().send(messagePayload);
+    // 3) Envía la notificación al topic
+    const response = await admin.messaging().sendToTopic(topic, messagePayload);
+
     console.log(`✅ Notificación enviada al topic "${topic}"`, response);
 
     // 4) Devuelve el resultado
     return res.status(200).json({
-      ok:     true,
+      ok:       true,
       topic,
       response
     });
@@ -201,5 +213,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-
- };
+};
