@@ -195,40 +195,32 @@ try {
 
 const messages = tokens.map(token => ({
   token,
-
-  // PARA ANDROID: necesita el campo notification
-  notification: {
+  // 1) sólo data, incluyendo title/body si quieres
+  data: {
     title,
-    body
+    body,
+    ...dataPayload
   },
-
-  // PARA iOS: necesita el alert dentro de apns.payload.aps
+  // 2) configuración Android custom
+  android: {
+    notification: {
+      icon: 'ic_notification',
+      color: '#F57C00',
+      sound: 'default'
+    }
+  },
+  // 3) configuración iOS custom
   apns: {
-    headers: { 'apns-priority': '10' },
     payload: {
       aps: {
         alert: { title, body },
         sound: 'default',
-        category: 'DEVOTIONAL'
+        category: 'YOUR_CATEGORY'
       }
     }
-  },
-
-  // DATOS ADICIONALES (hash, type, timestamp...)
-  data: {
-    url: url || '/',
-    type: notificationData.type || 'general',
-    timestamp: Date.now().toString()
-  },
-
-  android: { 
-    notification: { 
-      icon: 'ic_notification', 
-      color: '#F57C00',
-      sound: 'default'
-    } 
   }
 }));
+
 
 
 
