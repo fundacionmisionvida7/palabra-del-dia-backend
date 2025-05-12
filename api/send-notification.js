@@ -148,8 +148,8 @@ export default async function handler(req, res) {
   // ——————————————————————————————————
   
 
-    try {
-    // 1) Mapea el type al nombre de topic
+   try {
+    // 1) Mapea type → topic
     const topicMap = {
       daily: "daily",
       verse: "verse",
@@ -164,42 +164,27 @@ export default async function handler(req, res) {
         .json({ error: `Tipo no válido para topic: ${notificationData.type}` });
     }
 
-    // 2) Construye SOLO el payload (sin 'topic' aquí)
+    // 2) Construye payload sólo con 'notification' y 'data'
     const payload = {
-      data: {
+      notification: {
         title,
-        body,
+        body
+      },
+      data: {
         url:       dataPayload.url,
         type:      dataPayload.type,
         timestamp: dataPayload.timestamp,
         ...(dataPayload.verseText      && { verseText: dataPayload.verseText }),
         ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
-      },
-      android: {
-        notification: {
-          icon:  'ic_notification',
-          color: '#F57C00',
-          sound: 'default'
-        }
-      },
-      apns: {
-        payload: {
-          aps: {
-            alert: { title, body },
-            sound: 'default',
-            category: 'DEVOTIONAL'
-          }
-        }
       }
     };
 
     console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-    // 3) Envía la notificación al topic CORRECTAMENTE
+    // 3) Envío correcto a topic
     const response = await admin.messaging().sendToTopic(topic, payload);
-
     console.log(`✅ Notificación enviada al topic "${topic}"`, response);
 
-    // 4) Devuelve el resultado
+    // 4) Respuesta al cliente
     return res.status(200).json({
       ok:       true,
       topic,
@@ -210,5 +195,6 @@ export default async function handler(req, res) {
     console.error("❌ Error enviando al topic:", err);
     return res.status(500).json({ error: err.message });
   }
+
 
 };
