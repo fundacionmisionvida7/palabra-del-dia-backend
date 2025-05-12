@@ -118,83 +118,39 @@ export default async function handler(req, res) {
   }
 
 
-// Después de haber calculado notificationData:
-  const { title, body, url, type: notifType } = notificationData;
+// … tras haber construido `notificationData` y `dataPayload` …
 
-// —— AÑADE AQUÍ ——
-// Construimos dataPayload SÓLO con strings:
-  const dataPayload = {
-    url:       String(url),
-    type:      String(notifType),
-    timestamp: Date.now().toString()
-  };
-  if (notificationData.verseText) {
-    dataPayload.verseText = String(notificationData.verseText);
-    dataPayload.verseReference = String(notificationData.verseReference);
-  }
+const { title, body, type: notifType } = notificationData;
+const topic = notifType; // ej. "daily", "verse", "event", "live"
 
-
-// —— FIN DEL BLOQUE ——
-
-// Validar campos
-  if (!title || !body) {
-    return res.status(400).json({ 
-      error: "Faltan campos: title y body son obligatorios" 
-    });
-  }
-
-  // ——————————————————————————————————
-  //  Envío por Topic Messaging en un solo llamado
-  // ——————————————————————————————————
-  
-
-   try {
-    // 1) Mapea type → topic
-    const topicMap = {
-      daily: "daily",
-      verse: "verse",
-      event: "event",
-      live:  "live",
-      test:  "test"
-    };
-    const topic = topicMap[notificationData.type];
-    if (!topic) {
-      return res
-        .status(400)
-        .json({ error: `Tipo no válido para topic: ${notificationData.type}` });
+try {
+  // 1) Armar el mensaje para HTTP v1
+  const message = {
+    topic,                       // sin "/topics/"
+    notification: {              // Chrome y Android mostrarán esto
+      title,
+      body
+    },
+    data: {                      // todo en strings
+      url:       dataPayload.url,
+      type:      dataPayload.type,
+      timestamp: dataPayload.timestamp,
+      ...(dataPayload.verseText      && { verseText: dataPayload.verseText }),
+      ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
     }
+  };
 
-    // 2) Construye payload sólo con 'notification' y 'data'
-    const payload = {
-      notification: {
-        title,
-        body
-      },
-      data: {
-        url:       dataPayload.url,
-        type:      dataPayload.type,
-        timestamp: dataPayload.timestamp,
-        ...(dataPayload.verseText      && { verseText: dataPayload.verseText }),
-        ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
-      }
-    };
+  console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
+  const response = await admin.messaging().send(message);
 
-    console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-    // 3) Envío correcto a topic
-    const response = await admin.messaging().sendToTopic(topic, payload);
-    console.log(`✅ Notificación enviada al topic "${topic}"`, response);
+  console.log(`✅ Notificación enviada correctamente:`, response);
+  return res.status(200).json({ ok: true, topic, response });
 
-    // 4) Respuesta al cliente
-    return res.status(200).json({
-      ok:       true,
-      topic,
-      response
-    });
+} catch (err) {
+  console.error("❌ Error enviando al topic:", err);
+  return res.status(500).json({ error: err.message });
+}
 
-  } catch (err) {
-    console.error("❌ Error enviando al topic:", err);
-    return res.status(500).json({ error: err.message });
-  }
 
 
 };
