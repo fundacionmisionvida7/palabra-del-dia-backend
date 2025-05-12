@@ -192,14 +192,31 @@ const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
        console.log("🚀 Enviando notificaciones en lotes...");
 
 try {
-  // Creación de mensajes FCM
+
   const messages = tokens.map(token => ({
-    token,
-   // notification: { title, body },
-    data:         dataPayload,
-    android:      { notification: { icon: "ic_notification", color: "#F57C00", sound: "default" } },
-    apns:         { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", category: "DEVOTIONAL" } } }
-  }));
+  token,
+  data: {
+    title,         // si quieres mostrarlo, pásalo por data también
+    body,
+    ...dataPayload
+  },
+  android: {
+    notification: {  // aquí sí defines tu icono/logo para Android
+      icon: 'ic_notification',
+      color: '#F57C00',
+      sound: 'default'
+    }
+  },
+  apns: {
+    payload: {
+      aps: {
+        alert: { title, body },
+        sound: 'default',
+        category: 'DEVOTIONAL'
+      }
+    }
+  }
+}));
 
 
 
