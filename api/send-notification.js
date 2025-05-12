@@ -195,13 +195,13 @@ try {
   // Creación de mensajes FCM
   const messages = tokens.map(token => ({
     token,
-    notification: { title, body },
+   // notification: { title, body },
     data:         dataPayload,
     android:      { notification: { icon: "ic_notification", color: "#F57C00", sound: "default" } },
     apns:         { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", category: "DEVOTIONAL" } } }
   }));
 
-  
+
 
   // Dividir en lotes de 500
   const chunks = [];
