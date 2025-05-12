@@ -146,57 +146,32 @@ export default async function handler(req, res) {
   // ——————————————————————————————————
   //  Envío por Topic Messaging en un solo llamado
   // ——————————————————————————————————
-  try {
-    // Mapea el type a topic
-    const topicMap = {
-      daily: "daily",
-      verse: "verse",
-      event: "event",
-      live:  "live",
-      test:  "test"
-    };
-    const topic = topicMap[notificationData.type];
-    if (!topic) {
-      return res.status(400).json({ error: "Tipo no válido para topic" });
+  
+
+// … después de definir title, body, dataPayload, etc.
+
+try {
+  const topicMap = { daily:"daily", verse:"verse", event:"event", live:"live", test:"test" };
+  const topic = topicMap[notificationData.type];
+  if (!topic) throw new Error("Tipo no válido para topic");
+
+  // Payload *solo* data:
+  const payload = {
+    data: {
+      title,
+      body,
+      ...dataPayload
     }
+  };
 
-    // Construye payload único
-    const payload = {
-      data: {
-        title,
-        body,
-        ...dataPayload
-      },
-      android: {
-        notification: {
-          icon: 'ic_notification',
-          color: '#F57C00',
-          sound: 'default'
-        }
-      },
-      apns: {
-        payload: {
-          aps: {
-            alert: { title, body },
-            sound: 'default',
-            category: 'YOUR_CATEGORY'
-          }
-        }
-      }
-    };
+  console.log(`🚀 Enviando notificación al topic "${topic}"…`);
+  const response = await admin.messaging().sendToTopic(topic, payload);
+  console.log(`✅ Enviado al topic "${topic}"`, response);
 
-    // Envía UNA SOLA notificación al topic
-    console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-    const response = await admin.messaging().sendToTopic(topic, payload);
-    console.log(`✅ Enviado al topic "${topic}"`, response);
+  return res.status(200).json({ ok: true, topic, response });
+} catch (err) {
+  console.error("❌ Error enviando al topic:", err);
+  return res.status(500).json({ error: err.message });
+}
 
-    return res.status(200).json({
-      ok: true,
-      topic,
-      response
-    });
-  } catch (err) {
-    console.error("❌ Error enviando al topic:", err);
-    return res.status(500).json({ error: err.message });
-  }
  };
