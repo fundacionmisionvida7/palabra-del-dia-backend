@@ -193,18 +193,13 @@ const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
 
 try {
   // Creación de mensajes FCM
- // Payload que ya tienes preparado:
- const payload = {
-   notification: { title, body },
-   data:         dataPayload,
-   android:      { /* … */ },
-   apns:         { /* … */ }
- };
-
- // Envío a topic "eventos":
- const response = await admin.messaging().sendToTopic('eventos', payload);
- console.log('✅ Enviado mensaje al topic "eventos":', response);
-
+  const messages = tokens.map(token => ({
+    token,
+    notification: { title, body },
+    data:         dataPayload,
+    android:      { notification: { icon: "ic_notification", color: "#F57C00", sound: "default" } },
+    apns:         { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default", category: "DEVOTIONAL" } } }
+  }));
 
   
 
