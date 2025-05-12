@@ -148,7 +148,7 @@ export default async function handler(req, res) {
   // ——————————————————————————————————
   
 
-  try {
+    try {
     // 1) Mapea el type al nombre de topic
     const topicMap = {
       daily: "daily",
@@ -164,17 +164,15 @@ export default async function handler(req, res) {
         .json({ error: `Tipo no válido para topic: ${notificationData.type}` });
     }
 
-    // 2) Construye el payload de la notificación
-    const messagePayload = {
-      topic,  // sin "/topics/"
+    // 2) Construye SOLO el payload (sin 'topic' aquí)
+    const payload = {
       data: {
         title,
         body,
         url:       dataPayload.url,
         type:      dataPayload.type,
         timestamp: dataPayload.timestamp,
-        // campos opcionales:
-        ...(dataPayload.verseText     && { verseText: dataPayload.verseText }),
+        ...(dataPayload.verseText      && { verseText: dataPayload.verseText }),
         ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
       },
       android: {
@@ -196,8 +194,8 @@ export default async function handler(req, res) {
     };
 
     console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-    // 3) Envía la notificación al topic
-    const response = await admin.messaging().sendToTopic(topic, messagePayload);
+    // 3) Envía la notificación al topic CORRECTAMENTE
+    const response = await admin.messaging().sendToTopic(topic, payload);
 
     console.log(`✅ Notificación enviada al topic "${topic}"`, response);
 
