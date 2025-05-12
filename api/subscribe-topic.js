@@ -1,4 +1,4 @@
-// api/subscribe-topic.js v1
+// api/subscribe-topic.js
 import admin from "../firebaseAdmin.js";
 
 export default async function handler(req, res) {
@@ -18,7 +18,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await admin.messaging().subscribeToTopic(token, topic);
+    // Suscribimos el token (como array) al topic
+    const response = await admin.messaging().subscribeToTopic([ token ], topic);
     console.log(`✅ Token suscrito a topic "${topic}"`, response);
     return res.status(200).json({ ok: true });
   } catch (err) {
