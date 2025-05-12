@@ -193,21 +193,18 @@ const tokens = Array.from(tokensSet).filter(t =>  // Línea 9
 
 try {
 
-  const messages = tokens.map(token => ({
+const messages = tokens.map(token => ({
   token,
-  data: {
-    title,         // si quieres mostrarlo, pásalo por data también
-    body,
-    ...dataPayload
+
+  // PARA ANDROID: necesita el campo notification
+  notification: {
+    title,
+    body
   },
-  android: {
-    notification: {  // aquí sí defines tu icono/logo para Android
-      icon: 'ic_notification',
-      color: '#F57C00',
-      sound: 'default'
-    }
-  },
+
+  // PARA iOS: necesita el alert dentro de apns.payload.aps
   apns: {
+    headers: { 'apns-priority': '10' },
     payload: {
       aps: {
         alert: { title, body },
@@ -215,6 +212,21 @@ try {
         category: 'DEVOTIONAL'
       }
     }
+  },
+
+  // DATOS ADICIONALES (hash, type, timestamp...)
+  data: {
+    url: url || '/',
+    type: notificationData.type || 'general',
+    timestamp: Date.now().toString()
+  },
+
+  android: { 
+    notification: { 
+      icon: 'ic_notification', 
+      color: '#F57C00',
+      sound: 'default'
+    } 
   }
 }));
 
