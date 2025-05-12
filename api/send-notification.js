@@ -119,25 +119,40 @@ export default async function handler(req, res) {
 
 
 // … tras haber construido `notificationData` y `dataPayload` …
-
 const { title, body, type: notifType } = notificationData;
-const topic = notifType; // ej. "daily", "verse", "event", "live"
+const topicMap = {
+  daily: "daily",
+  verse: "verse",
+  event: "event",
+  live:  "live",
+  test:  "test"
+};
+const topic = topicMap[notifType];
+if (!topic) {
+  return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
+}
+
+// ✅ dataPayload debe estar definido antes de usarlo
+const dataPayload = {
+  url:       String(notificationData.url || "/"),
+  type:      String(notificationData.type || "unknown"),
+  timestamp: Date.now().toString()
+};
+if (notificationData.verseText) {
+  dataPayload.verseText = String(notificationData.verseText);
+}
+if (notificationData.verseReference) {
+  dataPayload.verseReference = String(notificationData.verseReference);
+}
 
 try {
-  // 1) Armar el mensaje para HTTP v1
   const message = {
-    topic,                       // sin "/topics/"
-    notification: {              // Chrome y Android mostrarán esto
+    topic,
+    notification: {
       title,
       body
     },
-    data: {                      // todo en strings
-      url:       dataPayload.url,
-      type:      dataPayload.type,
-      timestamp: dataPayload.timestamp,
-      ...(dataPayload.verseText      && { verseText: dataPayload.verseText }),
-      ...(dataPayload.verseReference && { verseReference: dataPayload.verseReference })
-    }
+    data: dataPayload
   };
 
   console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
