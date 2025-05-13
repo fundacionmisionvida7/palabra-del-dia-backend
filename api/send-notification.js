@@ -79,53 +79,51 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { title, body, type: notifType } = notificationData;
+ const { title, body, type: notifType } = notificationData;
 
-  // Mapeo de tipo → topic
-  const topicMap = {
-    daily: "daily",
-    verse: "verse",
-    event: "event",
-    live:  "live",
-    test:  "test"
-  };
-  const topic = topicMap[notifType];
-  if (!topic) {
-    return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
-  }
-
-  // Armado del dataPayload
-  const dataPayload = {
-    url:       String(notificationData.url || "/"),
-    type:      String(notificationData.type || "unknown"),
-    timestamp: Date.now().toString()
-  };
-  if (notificationData.verseText) {
-    dataPayload.verseText = String(notificationData.verseText);
-  }
-  if (notificationData.verseReference) {
-    dataPayload.verseReference = String(notificationData.verseReference);
-  }
-
-  // Envío a topic
-  try {
-    const message = {
-      topic,
-      notification: {
-        title,
-        body
-      },
-      data: dataPayload
-    };
-
-    console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
-    const response = await admin.messaging().send(message);
-    console.log(`✅ Notificación enviada correctamente:`, response);
-
-    return res.status(200).json({ ok: true, topic, response });
-
-  } catch (err) {
-    console.error("❌ Error enviando al topic:", err);
-    return res.status(500).json({ error: err.message });
-  }
+// Mapeo de tipo → topic
+const topicMap = {
+  daily: "daily",
+  verse: "verse",
+  event: "event",
+  live:  "live",
+  test:  "test"
+};
+const topic = topicMap[notifType];
+if (!topic) {
+  return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
 }
+
+// Armado del dataPayload (incluimos aquí también icon y demás)
+const dataPayload = {
+  title:     String(title),
+  body:      String(body),
+  icon:      "https://mision-vida-app.web.app/icon.png",
+  url:       String(notificationData.url || "/"),
+  type:      String(notificationData.type || "unknown"),
+  timestamp: Date.now().toString()
+};
+if (notificationData.verseText) {
+  dataPayload.verseText = String(notificationData.verseText);
+}
+if (notificationData.verseReference) {
+  dataPayload.verseReference = String(notificationData.verseReference);
+}
+
+try {
+  const message = {
+    topic,
+    data: dataPayload
+  };
+
+  console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
+  const response = await admin.messaging().send(message);
+  console.log(`✅ Notificación enviada correctamente:`, response);
+
+  return res.status(200).json({ ok: true, topic, response });
+
+} catch (err) {
+  console.error("❌ Error enviando al topic:", err);
+  return res.status(500).json({ error: err.message });
+}
+};
