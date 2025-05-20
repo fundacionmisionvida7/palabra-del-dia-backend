@@ -55,6 +55,17 @@ export default async function handler(req, res) {
         type:  "event"
       };
 
+      
+     } else if (type === "news") {
+      notificationData = {
+        title: "📰 Atencion, Atencion!",
+        body:  `Hay una nueva noticia!`,
+        url:   "#noticias",
+        type:  "news"
+      };
+
+      
+
  } else if (type === "live") {
     // ─────────── OJO AQUÍ ───────────
     // 1) Consultar a YouTube si hay live
@@ -89,13 +100,6 @@ export default async function handler(req, res) {
       type:  "live"
     };
 
-    } else if (type === "test") {
-      notificationData = {
-        title: "🧪 Notificación de prueba",
-        body:  `Esta es una notificación de prueba (${new Date().toLocaleString()})`,
-        url:   "/",
-        type:  "test"
-      };
 
     } else {
       return res.status(400).json({ error: "Tipo de notificación inválido" });
@@ -113,7 +117,7 @@ const topicMap = {
   verse: "verse",
   event: "event",
   live:  "live",
-  test:  "test"
+  news:  "news"
 };
 const topic = topicMap[notifType];
 if (!topic) {
