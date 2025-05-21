@@ -64,10 +64,35 @@ notificationData = {
      } else if (type === "news") {
       notificationData = {
         title: "📰 Atencion, Atencion!",
-        body:  `Hay una nueva noticia!`,
+        body:  `Hay nuevas noticias!`,
         url:   "#noticias",
         type:  "news"
       };
+
+
+      } else if (type === "update") {
+  // Envía notificación a todos los suscritos al topic "updates"
+  notificationData = {
+    title: "⚙️ ¡Nueva versión de la app disponible!",
+    body:  `Versión ${process.env.SW_VERSION || 'desconocida'} instalada.`,
+    url:   "/",      // o donde quieras que entren
+    type:  "update",
+    version: process.env.SW_VERSION  // pásala desde tu GH Action si quieres
+  };
+  // Indica que el mensaje debe ir al topic "updates"
+  message = {
+    topic: "updates",
+    notification: {
+      title: notificationData.title,
+      body:  notificationData.body
+    },
+    data: {
+      type:       notificationData.type,
+      version:    notificationData.version,
+      url:        notificationData.url
+    }
+  };
+
 
       
 
