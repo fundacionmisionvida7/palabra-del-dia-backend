@@ -70,15 +70,15 @@ notificationData = {
       };
 
 
-      } else if (type === "update") {
-  // Envía notificación a todos los suscritos al topic "updates"
-  notificationData = {
-    title: "⚙️ ¡Nueva versión de la app disponible!",
-    body:  `Versión ${process.env.SW_VERSION || 'desconocida'} instalada.`,
-    url:   "/",      // o donde quieras que entren
-    type:  "update",
-    version: process.env.SW_VERSION  // pásala desde tu GH Action si quieres
-  };
+    } else if (type === "update") {
+      notificationData = {
+        title:   "⚙️ ¡Nueva versión de la app disponible!",
+        body:    `Se ha publicado la versión ${process.env.SW_VERSION || 'desconocida'}.`,
+        url:     "/",          // al hacer clic va al inicio
+        type:    "update",
+        version: process.env.SW_VERSION || '—'
+      };
+
   // Indica que el mensaje debe ir al topic "updates"
   message = {
     topic: "updates",
@@ -147,7 +147,8 @@ const topicMap = {
   verse: "verse",
   event: "event",
   live:  "live",
-  news:  "news"
+  news:  "news",
+  update: "updates"    // <— agregamos aquí
 };
 const topic = topicMap[notifType];
 if (!topic) {
