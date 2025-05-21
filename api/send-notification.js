@@ -34,14 +34,19 @@ export default async function handler(req, res) {
         const idx = Math.floor(Math.random() * list.length);
         const verse = list[idx];
 
-        notificationData = {
-          title:          "🙏 ¡Nuevo versículo del día!",
-          body:           verse.texto,
-          url:            "#versiculo",
-          type:           "verse",
-          verseText:      verse.texto,
-          verseReference: verse.referencia
-        };
+notificationData = {
+  title:       "🙏 ¡Nuevo versículo del día!",
+  body:        verse.texto,
+  url:         "#versiculo",
+  type:        "verse",
+  // El texto del versículo
+  verseText:   verse.texto,
+  // Clave para la referencia, coincidente con tu cliente
+  referencia:  verse.referencia,
+  // Y muy importante: la versión de la Biblia
+  version:     verse.version  || verse.versionName  || "RVR1960"
+};
+
       } catch (err) {
         console.error("❌ Error leyendo versiculos.json:", err);
         return res.status(500).json({ error: "Error al leer versiculos.json" });
