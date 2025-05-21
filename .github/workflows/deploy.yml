@@ -1,0 +1,11 @@
+jobs:
+  deploy:
+    # … tu job que hace build y deploy …
+  notify_update:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Avisar nueva versión
+        run: |
+          curl -X GET "https://tu-dominio.com/api/send-notification?type=update" \
+            -H "Content-Type: application/json"
