@@ -8,31 +8,26 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Vercel
+    name: Deploy Backend & Notify Update
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Install dependencies
-        # Usa npm ci si tienes package-lock.json, sino npm install
         run: npm ci
 
-      # Si tu backend no necesita build (solo Serverless), COMENTA este paso
-      - name: Build project
-        run: npm run build
+      # Como no tienes "build", eliminamos este paso:
+      # - name: Build project
+      #   run: npm run build
 
       - name: Deploy to Vercel
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: npx vercel --prod --confirm
 
-  notify_update:
-    name: Notify App Update
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
       - name: Send Update Notification via FCM
+        # <-- este paso corre justo tras el deploy
         run: |
           curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=update" \
             -H "Content-Type: application/json"
