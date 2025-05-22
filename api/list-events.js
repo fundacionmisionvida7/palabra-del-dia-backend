@@ -1,24 +1,27 @@
+// api/list-events.js
 import admin from 'firebase-admin';
 
-// Inicializa admin si no existe
+// Inicializa Admin (solo una vez)
 if (!admin.apps.length) {
   admin.initializeApp({
+    // El bucket de tu Storage:
     storageBucket: 'mision-vida-app.appspot.com',
-    // opcional: credenciales vía GOOGLE_APPLICATION_CREDENTIALS o env vars
+    // Las credenciales en Vercel: configura GOOGLE_APPLICATION_CREDENTIALS o las vars que necesites
   });
 }
 
 const bucket = admin.storage().bucket();
 
 export default async function handler(req, res) {
-  const folder = req.query.folder;  // por ejemplo "EventosViejos"
   try {
-    const [files] = await bucket.getFiles({ prefix: `eventos/${folder}/` });
-    // Devuelve solo los nombres o construye url con getSignedUrl
-    const names = files.map(f => f.name);
-    res.status(200).json(names);
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: e.message });
+    const folder = req.query.folder;               // "EventosViejos" o "EventosNuevos"
+    const prefix = `eventos/${folder}/`;
+    const [files] = await bucket.getFiles({ prefix });
+    // Extraemos solo el nombre del archivo (sin la carpeta):
+    const names = files.map(f => f.name.split('/').pop());
+    return res.status(200).json(names);
+  } catch (err) {
+    console.error('Error proxy list-events:', err);
+    return res.status(500).json({ error: err.message });
   }
 }
