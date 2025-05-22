@@ -3,24 +3,24 @@ import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs";
 
 
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-
-// 1) Determinar ruta a service-worker.js
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const swPath     = resolve(__dirname, '../service-worker.js');  // Ajusta si tu estructura difiere
-
-// 2) Leer y extraer SW_VERSION
+// Al principio de send-notification.js
 async function getSWVersion() {
   try {
-    const code = await fs.readFile(swPath, 'utf-8');
-    const m    = code.match(/const\s+SW_VERSION\s*=\s*['"]([^'"]+)['"]/);
+    // 1) URL pública de tu Service Worker en Firebase Hosting:
+    const url = 'https://mision-vida-app.web.app/service-worker.js';
+    // 2) Fetch remoto
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const code = await resp.text();
+    // 3) Extraer la versión con regex
+    const m = code.match(/const\s+SW_VERSION\s*=\s*['"]([^'"]+)['"]/);
     return m ? m[1] : 'desconocida';
   } catch (e) {
-    console.warn('No pude leer service-worker.js para versión:', e);
+    console.warn('No pude leer service-worker.js remoto:', e);
     return 'desconocida';
   }
 }
+
 
 
 export default async function handler(req, res) {
@@ -95,12 +95,15 @@ notificationData = {
   const version = await getSWVersion();
 
   notificationData = {
-    title:   "⚙️ ¡Nueva versión de la app disponible!",
+    title:   "⚙️ ¡Nueva versión disponible!",
     body:    `Se ha publicado la versión ${version}.`,
     url:     "/",
     type:    "update",
-    version,  // el mismo que lee del SW
+    version,
   };
+
+
+
 
      
 
