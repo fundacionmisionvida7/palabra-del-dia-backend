@@ -2,6 +2,27 @@
 import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs";
 
+import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+// 1) Determinar ruta a service-worker.js
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const swPath     = resolve(__dirname, '../service-worker.js');  // Ajusta si tu estructura difiere
+
+// 2) Leer y extraer SW_VERSION
+async function getSWVersion() {
+  try {
+    const code = await fs.readFile(swPath, 'utf-8');
+    const m    = code.match(/const\s+SW_VERSION\s*=\s*['"]([^'"]+)['"]/);
+    return m ? m[1] : 'desconocida';
+  } catch (e) {
+    console.warn('No pude leer service-worker.js para versión:', e);
+    return 'desconocida';
+  }
+}
+
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -70,16 +91,18 @@ notificationData = {
       };
 
 
-    } else if (type === "update") {
-      notificationData = {
-        title:   "⚙️ ¡Nueva versión de la app disponible!",
-        body:    `Se ha publicado la versión ${process.env.SW_VERSION || 'desconocida'}.`,
-        url:     "/",          // al hacer clic va al inicio
-        type:    "update",
-        version: process.env.SW_VERSION || '—'
-      };
+} else if (type === "update") {
+  const version = await getSWVersion();
 
-      
+  notificationData = {
+    title:   "⚙️ ¡Nueva versión de la app disponible!",
+    body:    `Se ha publicado la versión ${version}.`,
+    url:     "/",
+    type:    "update",
+    version,  // el mismo que lee del SW
+  };
+
+     
 
  } else if (type === "live") {
     // ─────────── OJO AQUÍ ───────────
