@@ -7,5 +7,5 @@ jobs:
     steps:
       - name: Avisar nueva versión
         run: |
-          curl -X GET "https://tu-dominio.com/api/send-notification?type=update" \
+          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=updates" \
             -H "Content-Type: application/json"
