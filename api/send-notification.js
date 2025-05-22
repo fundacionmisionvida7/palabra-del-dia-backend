@@ -2,7 +2,7 @@
 import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs";
 
-import fs from 'fs/promises';
+
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
