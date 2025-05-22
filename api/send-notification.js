@@ -79,21 +79,6 @@ notificationData = {
         version: process.env.SW_VERSION || '—'
       };
 
-  // Indica que el mensaje debe ir al topic "updates"
-  message = {
-    topic: "updates",
-    notification: {
-      title: notificationData.title,
-      body:  notificationData.body
-    },
-    data: {
-      type:       notificationData.type,
-      version:    notificationData.version,
-      url:        notificationData.url
-    }
-  };
-
-
       
 
  } else if (type === "live") {
