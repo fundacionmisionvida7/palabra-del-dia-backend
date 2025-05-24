@@ -2,34 +2,49 @@ name: Verificar si hay Culto en Vivo
 
 on:
   schedule:
-    - cron: '*/5 * * * *' # Cada 5 minutos
+    - cron: '*/15 20-23 * * *'  # Parte 1 del horario ARG (17-20 hs)
+    - cron: '*/15 0-2 * * *'    # Parte 2 del horario ARG (21-23 hs)
   workflow_dispatch:
 
 jobs:
   check-live:
     runs-on: ubuntu-latest
     steps:
+      - name: Crear archivo temporal para cache
+        run: mkdir -p cache && touch cache/.last_live_id.txt
+
       - name: Verificar transmisión en vivo
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           CHANNEL_ID: UC_cQTyQB4mDHiLU9qrWO_iA
         run: |
           echo "Consultando YouTube Live..."
+          
           RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
-          
+
           LIVE_COUNT=$(echo "$RESPONSE" | jq '.items | length')
-          
-          echo "Cantidad de transmisiones en vivo: $LIVE_COUNT"
-          
+          echo "Transmisiones encontradas: $LIVE_COUNT"
+
           if [ "$LIVE_COUNT" -gt 0 ]; then
-            echo "¡Hay transmisión en vivo! Enviando notificación..."
-            curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
-              -H "Content-Type: application/json" \
-              --retry 3 \
-              --retry-delay 5 \
-              --connect-timeout 30 \
-              --max-time 60
+            VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId')
+            echo "Video en vivo actual: $VIDEO_ID"
+
+            LAST_ID=$(cat cache/.last_live_id.txt)
+            echo "Último video notificado: $LAST_ID"
+
+            if [ "$VIDEO_ID" != "$LAST_ID" ]; then
+              echo "🔔 Enviando notificación porque es un video nuevo..."
+              curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
+                -H "Content-Type: application/json" \
+                --retry 3 \
+                --retry-delay 5 \
+                --connect-timeout 30 \
+                --max-time 60
+
+              echo "$VIDEO_ID" > cache/.last_live_id.txt
+            else
+              echo "⏸ Mismo video en vivo detectado. No se envía nueva notificación."
+            fi
           else
-            echo "No hay transmisión en vivo actualmente."
+            echo "❌ No hay transmisión en vivo actualmente."
           fi
-        timeout-minutes: 5 # ⚠️ Asegúrate de que esta línea esté al mismo nivel que 'run' y 'env'
