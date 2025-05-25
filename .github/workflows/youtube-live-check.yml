@@ -2,49 +2,65 @@ name: Verificar si hay Culto en Vivo
 
 on:
   schedule:
-    - cron: '*/15 20-23 * * *'  # Parte 1 del horario ARG (17-20 hs)
-    - cron: '*/15 0-2 * * *'    # Parte 2 del horario ARG (21-23 hs)
+    - cron: '*/15 17-23 * * *'  # Cada 15 minutos de 17 a 23hs
   workflow_dispatch:
 
 jobs:
   check-live:
     runs-on: ubuntu-latest
     steps:
-      - name: Crear archivo temporal para cache
-        run: mkdir -p cache && touch cache/.last_live_id.txt
+      - name: Instalar dependencias necesarias
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
 
       - name: Verificar transmisión en vivo
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          CHANNEL_ID: UC_cQTyQB4mDHiLU9qrWO_iA
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          NOTIF_ENDPOINT: ${{ secrets.NOTIF_ENDPOINT }}
+          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
         run: |
-          echo "Consultando YouTube Live..."
+          echo "🔍 Consultando YouTube Live..."
+          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
           
-          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+          LIVE_VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId // empty')
 
-          LIVE_COUNT=$(echo "$RESPONSE" | jq '.items | length')
-          echo "Transmisiones encontradas: $LIVE_COUNT"
-
-          if [ "$LIVE_COUNT" -gt 0 ]; then
-            VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId')
-            echo "Video en vivo actual: $VIDEO_ID"
-
-            LAST_ID=$(cat cache/.last_live_id.txt)
-            echo "Último video notificado: $LAST_ID"
-
-            if [ "$VIDEO_ID" != "$LAST_ID" ]; then
-              echo "🔔 Enviando notificación porque es un video nuevo..."
-              curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=live" \
-                -H "Content-Type: application/json" \
-                --retry 3 \
-                --retry-delay 5 \
-                --connect-timeout 30 \
-                --max-time 60
-
-              echo "$VIDEO_ID" > cache/.last_live_id.txt
-            else
-              echo "⏸ Mismo video en vivo detectado. No se envía nueva notificación."
-            fi
-          else
+          if [ -z "$LIVE_VIDEO_ID" ]; then
             echo "❌ No hay transmisión en vivo actualmente."
+            exit 0
           fi
+
+          echo "📺 Video en vivo detectado: $LIVE_VIDEO_ID"
+
+          # Crear archivo JSON con claves para Firebase
+          echo "$FIREBASE_SERVICE_ACCOUNT_KEY" > firebase-key.json
+
+          # Verificar último ID guardado en Firestore
+          curl -s -X POST https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents:runQuery \
+            -H "Content-Type: application/json" \
+            -d '{
+              "structuredQuery": {
+                "from": [{"collectionId": "estado"}],
+                "limit": 1
+              }
+            }' \
+            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" > firestore-check.json
+
+          LAST_ID=$(jq -r '.[0].document.fields.liveVideoId.stringValue // empty' firestore-check.json)
+
+          if [ "$LIVE_VIDEO_ID" = "$LAST_ID" ]; then
+            echo "⏩ Ya se notificó esta transmisión. No se envía notificación."
+            exit 0
+          fi
+
+          echo "✅ Nueva transmisión detectada, enviando notificación..."
+          curl -s "$NOTIF_ENDPOINT"
+
+          echo "💾 Guardando nuevo ID de transmisión en Firestore..."
+
+          curl -X PATCH \
+            "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/estado/liveStream" \
+            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
+            -H "Content-Type: application/json" \
+            -d "{\"fields\": {\"liveVideoId\": {\"stringValue\": \"$LIVE_VIDEO_ID\"}}}"
