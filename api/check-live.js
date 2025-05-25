@@ -1,53 +1,59 @@
-// pages/api/check-live.js
-import fetch from 'node-fetch';
-import { initializeApp, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+name: Verificar si hay Culto en Vivo
 
-// Initialize Firebase Admin SDK once
-if (!global.firebaseAdminApp) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
-  global.firebaseAdminApp = initializeApp({
-    credential: cert(serviceAccount)
-  });
-}
-const db = getFirestore(global.firebaseAdminApp);
+on:
+  schedule:
+    - cron: '*/15 17-23 * * *'  # Cada 15 minutos de 17:00 a 23:00 hora local
+  workflow_dispatch:
 
-// Endpoint to check live stream and send notification if new
-export default async function handler(req, res) {
-  try {
-    const API_KEY = process.env.YOUTUBE_API_KEY;
-    const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-    const NOTIF_URL = process.env.NOTIF_ENDPOINT; // e.g., https://.../api/send-notification?type=live
+jobs:
+  check-live:
+    runs-on: ubuntu-latest
 
-    // Fetch live stream data
-    const liveUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&eventType=live&type=video&key=${API_KEY}`;
-    const liveResp = await fetch(liveUrl);
-    if (!liveResp.ok) {
-      const err = await liveResp.json();
-      console.error('YouTube API error:', err);
-      return res.status(liveResp.status).json({ error: err.error });
-    }
-    const liveData = await liveResp.json();
-    const liveItems = liveData.items || [];
-    const newVideoId = liveItems.length > 0 ? liveItems[0].id.videoId : null;
+    steps:
+      - name: Instalar herramientas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
 
-    // Reference to Firestore document
-    const docRef = db.collection('liveStatus').doc('lastLive');
-    const docSnap = await docRef.get();
-    const lastLiveId = docSnap.exists ? docSnap.data().videoId : null;
+      - name: Verificar transmisión en vivo y notificar
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          YOUTUBE_API_KEY:        ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID:     ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          NOTIF_ENDPOINT:         ${{ secrets.NOTIF_ENDPOINT }}
+        run: |
+          echo "🔍 Consultando YouTube Live..."
+          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+          LIVE_VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId // empty')
 
-    // If there is a live video and it's new
-    if (newVideoId && newVideoId !== lastLiveId) {
-      // Update Firestore
-      await docRef.set({ videoId: newVideoId, updatedAt: new Date() });
-      // Trigger notification
-      await fetch(NOTIF_URL);
-      return res.status(200).json({ notified: true, videoId: newVideoId });
-    }
+          if [ -z "$LIVE_VIDEO_ID" ]; then
+            echo "❌ No hay transmisión en vivo."
+            exit 0
+          fi
+          echo "📺 Transmisión en vivo: $LIVE_VIDEO_ID"
 
-    return res.status(200).json({ notified: false, videoId: newVideoId });
-  } catch (error) {
-    console.error('check-live error:', error);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-}
+          # Guardar JSON de credenciales para Firebase Admin SDK
+          echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-key.json
+
+          # Inicializar gcloud con esas credenciales
+          gcloud auth activate-service-account --key-file=firebase-key.json
+
+          # Leer último ID guardado en Firestore
+          LAST_ID=$( \
+            gcloud firestore documents describe projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+            --format="value(fields.liveVideoId.stringValue)" \
+          )
+
+          if [ "$LIVE_VIDEO_ID" = "$LAST_ID" ]; then
+            echo "⏸ Ya notificado: $LAST_ID"
+            exit 0
+          fi
+
+          echo "✅ Video nuevo, enviando notificación..."
+          curl -s "$NOTIF_ENDPOINT"
+
+          echo "💾 Actualizando Firestore con el nuevo ID..."
+          gcloud firestore documents update projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+            --update-field="liveVideoId=$LIVE_VIDEO_ID"
+
+          echo "✔️ Listo."
