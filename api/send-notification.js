@@ -183,10 +183,21 @@ if (notificationData.verseReference) {
 }
 
 try {
-  const message = {
-    topic,
-    data: dataPayload
-  };
+const message = {
+  topic,
+  notification: {
+    title:     notificationData.title,
+    body:      notificationData.body,
+  },
+  webpush: {
+    fcmOptions: {
+      link: 'https://mision-vida-app.web.app/?notification=live'
+    }
+  },
+  data: dataPayload
+};
+
+
 
   console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
   const response = await admin.messaging().send(message);
