@@ -21,14 +21,15 @@ jobs:
 
       - name: Verificar transmisión en vivo y notificar
         env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          YOUTUBE_API_KEY:        ${{ secrets.YOUTUBE_API_KEY }}
-          YOUTUBE_CHANNEL_ID:     ${{ secrets.YOUTUBE_CHANNEL_ID }}
-          NOTIF_ENDPOINT:         ${{ secrets.NOTIF_ENDPOINT }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          CHANNEL_ID:      ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          NOTIF_ENDPOINT:  ${{ secrets.NOTIF_ENDPOINT }}
         run: |
           echo "🔍 Consultando YouTube Live..."
-          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
           LIVE_VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId // empty')
+
+
 
           if [ -z "$LIVE_VIDEO_ID" ]; then
             echo "❌ No hay transmisión en vivo."
