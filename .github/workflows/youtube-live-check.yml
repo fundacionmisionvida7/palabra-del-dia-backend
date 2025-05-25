@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Debug: Listar nombres de env
+        run: env | grep -E 'FIREBASE_SERVICE_ACCOUNT|YOUTUBE_API_KEY|YOUTUBE_CHANNEL_ID|NOTIF_ENDPOINT'
+
       - name: Instalar herramientas
         run: |
           sudo apt-get update
