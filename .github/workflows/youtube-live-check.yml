@@ -2,65 +2,58 @@ name: Verificar si hay Culto en Vivo
 
 on:
   schedule:
-    - cron: '*/15 17-23 * * *'  # Cada 15 minutos de 17 a 23hs
+    - cron: '*/15 17-23 * * *'  # Cada 15 minutos de 17:00 a 23:00 hora local
   workflow_dispatch:
 
 jobs:
   check-live:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Instalar dependencias necesarias
+      - name: Instalar herramientas
         run: |
           sudo apt-get update
           sudo apt-get install -y jq curl
 
-      - name: Verificar transmisión en vivo
+      - name: Verificar transmisión en vivo y notificar
         env:
-          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
-          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
-          NOTIF_ENDPOINT: ${{ secrets.NOTIF_ENDPOINT }}
-          FIREBASE_SERVICE_ACCOUNT_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_KEY }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          YOUTUBE_API_KEY:        ${{ secrets.YOUTUBE_API_KEY }}
+          YOUTUBE_CHANNEL_ID:     ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          NOTIF_ENDPOINT:         ${{ secrets.NOTIF_ENDPOINT }}
         run: |
           echo "🔍 Consultando YouTube Live..."
           RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
-          
           LIVE_VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId // empty')
 
           if [ -z "$LIVE_VIDEO_ID" ]; then
-            echo "❌ No hay transmisión en vivo actualmente."
+            echo "❌ No hay transmisión en vivo."
             exit 0
           fi
+          echo "📺 Transmisión en vivo: $LIVE_VIDEO_ID"
 
-          echo "📺 Video en vivo detectado: $LIVE_VIDEO_ID"
+          # Guardar JSON de credenciales para Firebase Admin SDK
+          echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-key.json
 
-          # Crear archivo JSON con claves para Firebase
-          echo "$FIREBASE_SERVICE_ACCOUNT_KEY" > firebase-key.json
+          # Inicializar gcloud con esas credenciales
+          gcloud auth activate-service-account --key-file=firebase-key.json
 
-          # Verificar último ID guardado en Firestore
-          curl -s -X POST https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents:runQuery \
-            -H "Content-Type: application/json" \
-            -d '{
-              "structuredQuery": {
-                "from": [{"collectionId": "estado"}],
-                "limit": 1
-              }
-            }' \
-            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" > firestore-check.json
-
-          LAST_ID=$(jq -r '.[0].document.fields.liveVideoId.stringValue // empty' firestore-check.json)
+          # Leer último ID guardado en Firestore
+          LAST_ID=$( \
+            gcloud firestore documents describe projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+            --format="value(fields.liveVideoId.stringValue)" \
+          )
 
           if [ "$LIVE_VIDEO_ID" = "$LAST_ID" ]; then
-            echo "⏩ Ya se notificó esta transmisión. No se envía notificación."
+            echo "⏸ Ya notificado: $LAST_ID"
             exit 0
           fi
 
-          echo "✅ Nueva transmisión detectada, enviando notificación..."
+          echo "✅ Video nuevo, enviando notificación..."
           curl -s "$NOTIF_ENDPOINT"
 
-          echo "💾 Guardando nuevo ID de transmisión en Firestore..."
+          echo "💾 Actualizando Firestore con el nuevo ID..."
+          gcloud firestore documents update projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+            --update-field="liveVideoId=$LIVE_VIDEO_ID"
 
-          curl -X PATCH \
-            "https://firestore.googleapis.com/v1/projects/$PROJECT_ID/databases/(default)/documents/estado/liveStream" \
-            -H "Authorization: Bearer $(gcloud auth application-default print-access-token)" \
-            -H "Content-Type: application/json" \
-            -d "{\"fields\": {\"liveVideoId\": {\"stringValue\": \"$LIVE_VIDEO_ID\"}}}"
+          echo "✔️ Listo."
