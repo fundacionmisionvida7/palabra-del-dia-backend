@@ -11,7 +11,8 @@ jobs:
 
     steps:
       - name: Debug: Listar nombres de env
-        run: env | grep -E 'FIREBASE_SERVICE_ACCOUNT|YOUTUBE_API_KEY|YOUTUBE_CHANNEL_ID|NOTIF_ENDPOINT'
+        run: |
+          env | grep -E 'FIREBASE_SERVICE_ACCOUNT|YOUTUBE_API_KEY|YOUTUBE_CHANNEL_ID|NOTIF_ENDPOINT'
 
       - name: Instalar herramientas
         run: |
@@ -35,16 +36,13 @@ jobs:
           fi
           echo "📺 Transmisión en vivo: $LIVE_VIDEO_ID"
 
-          # Guardar JSON de credenciales para Firebase Admin SDK
           echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-key.json
-
-          # Inicializar gcloud con esas credenciales
           gcloud auth activate-service-account --key-file=firebase-key.json
 
-          # Leer último ID guardado en Firestore
-          LAST_ID=$( \
-            gcloud firestore documents describe projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
-            --format="value(fields.liveVideoId.stringValue)" \
+          LAST_ID=$(
+            gcloud firestore documents describe \
+              projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+              --format="value(fields.liveVideoId.stringValue)"
           )
 
           if [ "$LIVE_VIDEO_ID" = "$LAST_ID" ]; then
@@ -56,7 +54,8 @@ jobs:
           curl -s "$NOTIF_ENDPOINT"
 
           echo "💾 Actualizando Firestore con el nuevo ID..."
-          gcloud firestore documents update projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+          gcloud firestore documents update \
+            projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
             --update-field="liveVideoId=$LIVE_VIDEO_ID"
 
           echo "✔️ Listo."
