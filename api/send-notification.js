@@ -175,27 +175,7 @@ const dataPayload = {
   type:      String(notificationData.type || "unknown"),
   timestamp: Date.now().toString()
 };
-if (notificationData.verseText) {
-  dataPayload.verseText = String(notificationData.verseText);
-}
-if (notificationData.verseReference) {
-  dataPayload.verseReference = String(notificationData.verseReference);
-}
 
-try {
-const message = {
-  topic,
-  notification: {
-    title:     notificationData.title,
-    body:      notificationData.body,
-  },
-  webpush: {
-    fcmOptions: {
-      link: 'https://mision-vida-app.web.app/?notification=live'
-    }
-  },
-  data: dataPayload
-};
 
 
 
@@ -209,4 +189,3 @@ const message = {
   console.error("❌ Error enviando al topic:", err);
   return res.status(500).json({ error: err.message });
 }
-};
