@@ -183,18 +183,9 @@ if (notificationData.verseReference) {
 }
 
 try {
-const message = {
-  topic,
-  notification: {
-    title:     notificationData.title,
-    body:      notificationData.body,
-  },
-  webpush: {
-    fcmOptions: {
-      link: 'https://mision-vida-app.web.app/?notification=live'
-    }
-  },
- // data: dataPayload
+  const message = {
+    topic,
+    data: dataPayload
 };
 
 
