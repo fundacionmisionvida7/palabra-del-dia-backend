@@ -175,7 +175,12 @@ const dataPayload = {
   type:      String(notificationData.type || "unknown"),
   timestamp: Date.now().toString()
 };
-
+if (notificationData.verseText) {
+  dataPayload.verseText = String(notificationData.verseText);
+}
+if (notificationData.verseReference) {
+  dataPayload.verseReference = String(notificationData.verseReference);
+}
 
 try {
 const message = {
@@ -189,7 +194,7 @@ const message = {
       link: 'https://mision-vida-app.web.app/?notification=live'
     }
   },
-  data: dataPayload
+ // data: dataPayload
 };
 
 
