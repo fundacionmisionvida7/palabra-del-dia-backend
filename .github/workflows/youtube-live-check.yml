@@ -9,7 +9,6 @@ jobs:
   check-live:
     runs-on: ubuntu-latest
     steps:
-    
       - name: Instalar herramientas
         run: |
           sudo apt-get update
@@ -22,36 +21,52 @@ jobs:
           YOUTUBE_CHANNEL_ID:     ${{ secrets.YOUTUBE_CHANNEL_ID }}
           NOTIF_ENDPOINT:         ${{ secrets.NOTIF_ENDPOINT }}
         run: |
+          set -e
+
           echo "🔍 Consultando YouTube Live..."
-          RESPONSE=$(curl -s "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+          RESPONSE=$(curl -s -H "Referer: https://mision-vida-app.web.app/" \
+            "https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=$YOUTUBE_CHANNEL_ID&eventType=live&type=video&key=$YOUTUBE_API_KEY")
+
+          # Intentar extraer videoId, si no hay items o error de clave/quota, LIVE_VIDEO_ID se queda vacío
           LIVE_VIDEO_ID=$(echo "$RESPONSE" | jq -r '.items[0].id.videoId // empty')
 
           if [ -z "$LIVE_VIDEO_ID" ]; then
-            echo "❌ No hay transmisión en vivo."
+            echo "❌ No hay transmisión en vivo o ocurrió un error. Terminando sin notificar."
             exit 0
           fi
-          echo "📺 Transmisión en vivo: $LIVE_VIDEO_ID"
+
+          echo "📺 Transmisión en vivo detectada: $LIVE_VIDEO_ID"
 
           echo "$FIREBASE_SERVICE_ACCOUNT" > firebase-key.json
           gcloud auth activate-service-account --key-file=firebase-key.json
 
+          # Leer último ID guardado (si no existe, guardamos un valor vacío)
           LAST_ID=$(
             gcloud firestore documents describe \
               projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
-              --format="value(fields.liveVideoId.stringValue)"
+              --format="value(fields.videoId.stringValue)" || echo ""
           )
 
           if [ "$LIVE_VIDEO_ID" = "$LAST_ID" ]; then
-            echo "⏸ Ya notificado: $LAST_ID"
+            echo "⏸ Ya se notificó este ID: $LAST_ID"
             exit 0
           fi
 
-          echo "✅ Video nuevo, enviando notificación..."
+          echo "✅ Nuevo video live, enviando notificación..."
           curl -s "$NOTIF_ENDPOINT"
 
           echo "💾 Actualizando Firestore con el nuevo ID..."
-          gcloud firestore documents update \
-            projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
-            --update-field="liveVideoId=$LIVE_VIDEO_ID"
+          if [ -n "$LAST_ID" ]; then
+            # Si ya existía el documento, actualizamos el campo videoId
+            gcloud firestore documents update \
+              projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus/lastLive \
+              --update-field="videoId=$LIVE_VIDEO_ID"
+          else
+            # Si no existía, creamos el documento completo
+            gcloud firestore documents create \
+              projects/$(gcloud config get-value project)/databases/(default)/documents/liveStatus \
+              --document-id="lastLive" \
+              --fields="videoId=string:$LIVE_VIDEO_ID"
+          fi
 
-          echo "✔️ Listo."
+          echo "✔️ Proceso completado correctamente."
