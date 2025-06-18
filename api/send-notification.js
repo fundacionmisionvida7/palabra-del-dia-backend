@@ -142,6 +142,18 @@ notificationData = {
     };
 
 
+
+        } else if (type === "Culto") {
+      notificationData = {
+        title: "🏚️ ¡Hoy hay culto!",
+        body:  "¡Hoy nos vemos en casa, te esperamos!",
+        url:   "#Culto",
+        type:  "Culto"
+      };
+
+
+
+
     } else {
       return res.status(400).json({ error: "Tipo de notificación inválido" });
     }
