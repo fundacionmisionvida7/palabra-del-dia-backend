@@ -181,7 +181,9 @@ const topicMap = {
   event: "event",
   live:  "live",
   news:  "news",
-  update: "updates"    // <— agregamos aquí
+  update: "updates",
+  Culto:  "Culto",
+  CultoEspecial: "CultoEspecial"
 };
 const topic = topicMap[notifType];
 if (!topic) {
