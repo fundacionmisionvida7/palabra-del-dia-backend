@@ -176,15 +176,16 @@ notificationData = {
 
 // Mapeo de tipo → topic
 const topicMap = {
-  daily: "daily",
-  verse: "verse",
-  event: "event",
-  live:  "live",
-  news:  "news",
-  update: "updates",
-  Culto:  "Culto",
-  CultoEspecial: "CultoEspecial"
+  daily:          "daily",
+  verse:          "verse",
+  event:          "event",
+  live:           "live",
+  news:           "news",
+  update:         "updates",       // ← ya estaba
+  Culto:           "Culto",
+  CultoEspecial:   "CultoEspecial"
 };
+
 const topic = topicMap[notifType];
 if (!topic) {
   return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
