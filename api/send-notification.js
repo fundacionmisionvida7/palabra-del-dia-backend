@@ -1,12 +1,9 @@
 // api/send-notification.js
-
 import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs";
+import { getFirestore } from "firebase-admin/firestore";
 
-// Obtener instancia de Firestore
-const db = admin.firestore();
-
-// Función para obtener la versión del service worker
+// Obtener versión del Service Worker remoto
 async function getSWVersion() {
   try {
     const url = 'https://mision-vida-app.web.app/service-worker.js';
@@ -24,129 +21,238 @@ async function getSWVersion() {
 export default async function handler(req, res) {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  if (req.method !== "GET") {
+  // Inicializar Firestore
+  const db = getFirestore();
+
+  let notificationData = {};
+
+  if (req.method === "POST") {
+    notificationData = req.body || {};
+
+  } else if (req.method === "GET") {
+    const { type } = req.query;
+    console.log("📩 Solicitud GET recibida");
+    console.log(`🔔 Tipo de notificación: ${type}`);
+
+    switch (type) {
+      case "daily":
+        notificationData = {
+          title: "📖 Palabra del Día",
+          body:  "¡Tu devocional de hoy ya está disponible!",
+          url:   "/",
+          type:  "daily"
+        };
+        break;
+
+      case "verse": {
+        try {
+          const jsonUrl = new URL("./data/versiculos.json", import.meta.url);
+          const file = await fs.readFile(jsonUrl, "utf-8");
+          const list = JSON.parse(file).versiculos;
+          const idx = Math.floor(Math.random() * list.length);
+          const verse = list[idx];
+
+          notificationData = {
+            title:       "🙏 ¡Nuevo versículo del día!",
+            body:        verse.texto,
+            url:         "#versiculo",
+            type:        "verse",
+            verseText:   verse.texto,
+            verseReference: verse.referencia,
+            version:     verse.version || verse.versionName || "RVR1960"
+          };
+        } catch (err) {
+          console.error("❌ Error leyendo versiculos.json:", err);
+          return res.status(500).json({ error: "Error al leer versiculos.json" });
+        }
+        break;
+      }
+
+      case "event":
+        notificationData = {
+          title: "🎉 ¡Nuevo evento!",
+          body:  "¡Ya está disponible el nuevo evento para ver!",
+          url:   "#eventos",
+          type:  "event"
+        };
+        break;
+
+      case "news":
+        notificationData = {
+          title: "📰 ¡Atención, atención!",
+          body:  "¡Hay nuevas noticias!",
+          url:   "#noticias",
+          type:  "news"
+        };
+        break;
+
+      case "update": {
+        const version = await getSWVersion();
+        notificationData = {
+          title:   "⚙️ ¡Nueva versión disponible!",
+          body:    `Se ha publicado la versión ${version}.`,
+          url:     "/",
+          type:    "update",
+          version,
+        };
+        break;
+      }
+
+      case "live": {
+        const YT_API_KEY = process.env.YT_API_KEY;
+        const CHANNEL_ID = process.env.YT_CHANNEL_ID;
+        const ytUrl = new URL('https://www.googleapis.com/youtube/v3/search');
+        ytUrl.search = new URLSearchParams({
+          part:       'snippet',
+          channelId:  CHANNEL_ID,
+          eventType:  'live',
+          type:       'video',
+          key:        YT_API_KEY
+        }).toString();
+
+        let liveLink = "#live";
+        try {
+          const ytRes  = await fetch(ytUrl);
+          const ytData = await ytRes.json();
+          if (ytRes.ok && ytData.items?.length > 0) {
+            const vid = ytData.items[0].id.videoId;
+            liveLink = `https://www.youtube.com/watch?v=${vid}`;
+          }
+        } catch (err) {
+          console.error('Error al consultar YouTube:', err);
+        }
+
+        notificationData = {
+          title: "🎥 ¡Estamos en vivo!",
+          body:  "Únete a la transmisión del culto ahora mismo.",
+          url:   liveLink,
+          type:  "live"
+        };
+        break;
+      }
+
+      case "Culto":
+        notificationData = {
+          title: "🏚️ ¡Hoy hay culto!",
+          body:  "¡Hoy nos vemos en casa, te esperamos!",
+          url:   "#Culto",
+          type:  "Culto"
+        };
+        break;
+
+      case "CultoEspecial":
+        notificationData = {
+          title: "⛪ ¡Hoy hay culto especial!",
+          body:  "¡Hoy tenemos reunión especial, te esperamos!",
+          url:   "#CultoEspecial",
+          type:  "CultoEspecial"
+        };
+        break;
+
+      case "Contacto":
+        notificationData = {
+          title: "📬 Nueva solicitud de contacto",
+          body:  "Un usuario ha completado el formulario de contacto.",
+          url:   "/#contacto",
+          type:  "Contacto"
+        };
+        break;
+
+      case "Oracion":
+        notificationData = {
+          title: "🙏 Nueva petición de oración",
+          body:  "Un usuario ha enviado una petición de oración.",
+          url:   "/#oracion",
+          type:  "Oracion"
+        };
+        break;
+
+      default:
+        return res.status(400).json({ error: `Tipo de notificación inválido: ${type}` });
+    }
+
+  } else {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
-  const { type } = req.query;
-  let notificationData;
+  const { title, body, type: notifType } = notificationData;
 
-  // Construir notificationData según tipo
-  switch (type) {
-    case "daily":
-      notificationData = { title: "📖 Palabra del Día", body: "¡Tu devocional de hoy ya está disponible!", url: "/", type };
-      break;
-    case "verse": {
-      try {
-        const file = await fs.readFile(new URL("./data/versiculos.json", import.meta.url), "utf-8");
-        const list = JSON.parse(file).versiculos;
-        const verse = list[Math.floor(Math.random() * list.length)];
-        notificationData = {
-          title: "🙏 ¡Nuevo versículo del día!",
-          body: verse.texto,
-          url: "#versiculo",
-          type,
-          verseText: verse.texto,
-          verseReference: verse.referencia,
-          version: verse.version || "RVR1960"
-        };
-      } catch (err) {
-        console.error(err);
-        return res.status(500).json({ error: "No pude leer versículos" });
-      }
-      break;
-    }
-    case "event":
-      notificationData = { title: "🎉 ¡Nuevo evento!", body: "¡Ya está disponible el nuevo evento para ver!", url: "#eventos", type };
-      break;
-    case "news":
-      notificationData = { title: "📰 ¡Hay noticias nuevas!", body: "Visita la sección de noticias para más información.", url: "#noticias", type };
-      break;
-    case "update": {
-      const version = await getSWVersion();
-      notificationData = { title: "⚙️ ¡Nueva versión disponible!", body: `Se ha publicado la versión ${version}.`, url: "/", type, version };
-      break;
-    }
-    case "live": {
-      const YT_API_KEY = process.env.YOUTUBE_API_KEY;
-      const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-      let liveLink = "#live";
-      try {
-        const ytRes = await fetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&eventType=live&type=video&key=${YT_API_KEY}`
-        );
-        const ytData = await ytRes.json();
-        if (ytData.items?.length) {
-          liveLink = `https://www.youtube.com/watch?v=${ytData.items[0].id.videoId}`;
-        }
-      } catch (e) {
-        console.warn(e);
-      }
-      notificationData = { title: "🎥 ¡Estamos en vivo!", body: "Únete a la transmisión del culto ahora mismo.", url: liveLink, type };
-      break;
-    }
-    case "Contacto":
-      notificationData = { title: "📩 Nuevo mensaje de contacto", body: "Tienes un nuevo mensaje desde la web.", url: "#contacto", type };
-      break;
-    case "Oracion":
-      notificationData = { title: "📬 Nuevo Pedido de Oración", body: "Tienes un nuevo pedido de oración.", url: "#oracion", type };
-      break;
-    default:
-      return res.status(400).json({ error: "Tipo de notificación inválido" });
-  }
+  // Mapeo de tipo → topic (solo para los que siguen topics)
+  const topicMap = {
+    daily:           "daily",
+    verse:           "verse",
+    event:           "event",
+    live:            "live",
+    news:            "news",
+    update:          "updates",
+    Culto:           "Culto",
+    CultoEspecial:   "CultoEspecial"
+  };
 
-  // Determinar flujo: admin-only o tópico
-  const adminTypes = ["Contacto", "Oracion"];
-  if (adminTypes.includes(type)) {
-    // NOTIFICACIÓN A ADMINS por token
-    try {
-      const adminsSnap = await db.collection("users").where("role", "==", "admin").get();
-      let tokens = [];
-      adminsSnap.forEach(doc => {
-        const u = doc.data();
-        if (Array.isArray(u.tokens)) tokens.push(...u.tokens);
-      });
-      tokens = [...new Set(tokens)];
-      console.log("Tokens admin a enviar:", tokens);
-      if (!tokens.length) return res.status(200).json({ message: "No hay tokens de admin." });
+  // Si es Contacto u Oración, envío directo a admins
+  if (["Contacto", "Oracion"].includes(notifType)) {
+    const adminsSnap = await db.collection('users')
+      .where('role', '==', 'admin')
+      .get();
 
-      // Enviar en lotes de 500
-      const BATCH_SIZE = 500;
-      let allResults = [];
-      for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
-        const chunk = tokens.slice(i, i + BATCH_SIZE);
-        console.log(`Enviando lote ${i / BATCH_SIZE + 1} (${chunk.length} tokens)…`);
-        const resp = await admin.messaging().sendToDevice(chunk, { notification: { title: notificationData.title, body: notificationData.body }, data: { url: notificationData.url, type: notificationData.type, timestamp: Date.now().toString() } });
-        allResults = allResults.concat(resp.results);
-      }
-      return res.status(200).json({ ok: true, totalTokens: tokens.length, batches: Math.ceil(tokens.length / BATCH_SIZE), results: allResults });
-    } catch (err) {
-      console.error("❌ Error enviando notificación a admins:", err);
-      return res.status(500).json({ error: err.message });
+    const tokens = [];
+    adminsSnap.forEach(doc => {
+      const userTokens = doc.data().tokens || [];
+      tokens.push(...userTokens);
+    });
+
+    if (tokens.length === 0) {
+      return res.status(200).json({ ok: false, message: 'No hay admins suscritos a notificaciones' });
     }
-  } else {
-    // NOTIFICACIÓN GLOBAL vía TOPIC
-    const topicMap = { daily: "daily", verse: "verse", event: "event", live: "live", news: "news", update: "updates", Culto: "Culto", CultoEspecial: "CultoEspecial" };
-    const topic = topicMap[type];
-    if (!topic) return res.status(400).json({ error: `Topic no configurado para tipo: ${type}` });
 
-    const message = {
-      topic,
-      notification: { title: notificationData.title, body: notificationData.body },
-      data: { url: notificationData.url, type: notificationData.type, timestamp: Date.now().toString() }
+    const dataPayload = {
+      title,
+      body,
+      icon:      "https://mision-vida-app.web.app/icon.png",
+      url:       notificationData.url || "/",
+      type:      notifType,
+      timestamp: Date.now().toString(),
+      ...(notificationData.verseText    && { verseText: notificationData.verseText }),
+      ...(notificationData.verseReference && { verseReference: notificationData.verseReference })
     };
+
     try {
-      console.log(`🚀 Enviando notificación al topic "${topic}"…`);
-      const response = await admin.messaging().send(message);
-      console.log(`✅ Notificación enviada correctamente al topic:`, response);
-      return res.status(200).json({ ok: true, topic, response });
+      console.log(`🚀 Enviando "${notifType}" a ${tokens.length} admins…`);
+      const batchResponse = await admin.messaging().sendEachForMulticast({ tokens, data: dataPayload });
+      return res.status(200).json({ ok: true, type: notifType, response: batchResponse });
     } catch (err) {
-      console.error("❌ Error enviando al topic:", err);
+      console.error(`❌ Error enviando a admins:`, err);
       return res.status(500).json({ error: err.message });
     }
   }
-}
+
+  // Resto: enví­o por topic
+  const topic = topicMap[notifType];
+  if (!topic) {
+    return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
+  }
+
+  const dataPayload = {
+    title,
+    body,
+    icon:      "https://mision-vida-app.web.app/icon.png",
+    url:       notificationData.url || "/",
+    type:      notifType,
+    timestamp: Date.now().toString(),
+    ...(notificationData.verseText    && { verseText: notificationData.verseText }),
+    ...(notificationData.verseReference && { verseReference: notificationData.verseReference })
+  };
+
+  try {
+    console.log(`🚀 Enviando a topic "${topic}"…`);
+    const response = await admin.messaging().send({ topic, data: dataPayload });
+    return res.status(200).json({ ok: true, topic, response });
+  } catch (err) {
+    console.error(`❌ Error enviando al topic:`, err);
+    return res.status(500).json({ error: err.message });
+  }
+};
