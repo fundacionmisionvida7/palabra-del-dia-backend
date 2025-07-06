@@ -141,6 +141,14 @@ export default async function handler(req, res) {
           type:  "Contacto"
         };
         break;
+      case "Contacto":
+        notificationData = {
+          title: "📬 Nuevo Pedido de Oracion",
+          body:  "Tienes un nuevo Pedido de Oracion.",
+          url:   "#oracion",
+          type:  "Oracion"
+        };
+        break;
       default:
         return res.status(400).json({ error: "Tipo de notificación inválido" });
     }
@@ -158,7 +166,8 @@ export default async function handler(req, res) {
     update:        "updates",
     Culto:         "Culto",
     CultoEspecial: "CultoEspecial",
-    Contacto:      "Contacto"
+    Contacto:      "Contacto",
+    Oracion:       "Oracion"
   };
   const topic = topicMap[notificationData.type];
   if (!topic) return res.status(400).json({ error: "Topic no configurado para este tipo" });
