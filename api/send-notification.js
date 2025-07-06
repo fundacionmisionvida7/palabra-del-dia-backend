@@ -1,19 +1,9 @@
 // api/send-notification.js
 
+
 import admin from "../firebaseAdmin.js";
-import { promises as fs } from "fs";
-
-// Initialize admin app (only once)
-if (!admin.apps.length) {
-  // Assumes you have a serviceAccountKey.json at project root
-  admin.initializeApp({
-    credential: admin.credential.cert(
-      JSON.parse(await fs.readFile("./serviceAccountKey.json", "utf-8"))
-    )
-  });
-}
-
 const db = admin.firestore();
+
 
 // Helper: fetch SW version for “update” notifications
 async function getSWVersion() {
@@ -199,6 +189,15 @@ export default async function handler(req, res) {
         ...(notificationData.verseReference && { verseReference: notificationData.verseReference })
       }
     };
+
+
+
+    console.log("Tokens admin a enviar:", tokens);
+if (!Array.isArray(tokens) || tokens.length === 0) {
+  console.warn("⚠️ No hay tokens de admin válidos.");
+  return res.status(200).json({ message: "No hay tokens de admin." });
+}
+
 
     const response = await admin.messaging().sendToDevice(tokens, payload);
     return res.status(200).json({ ok: true, results: response.results });
