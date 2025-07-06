@@ -157,7 +157,7 @@ export default async function handler(req, res) {
         notificationData = {
           title: "📬 Nueva solicitud de contacto",
           body:  "Un usuario ha completado el formulario de contacto.",
-          url:   "/#contacto",
+          url:   "misionvida://Mensajes",
           type:  "Contacto"
         };
         break;
@@ -166,7 +166,7 @@ export default async function handler(req, res) {
         notificationData = {
           title: "🙏 Nueva petición de oración",
           body:  "Un usuario ha enviado una petición de oración.",
-          url:   "/#oracion",
+          url:   "misionvida://Pedidos",
           type:  "Oracion"
         };
         break;
