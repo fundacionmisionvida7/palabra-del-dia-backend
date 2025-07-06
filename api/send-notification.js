@@ -160,7 +160,8 @@ export default async function handler(req, res) {
     Oracion:       "Oracion"
   };
   const topic = topicMap[notificationData.type];
-  if (!topic) return res.status(400).json({ error: "Topic no configurado para este tipo" });
+  if (!topic) 
+    return res.status(400).json({ error: "Topic no configurado para este tipo" });
 
   // Fetch admin user tokens
   try {
@@ -174,7 +175,8 @@ export default async function handler(req, res) {
       if (Array.isArray(u.tokens)) tokens.push(...u.tokens);
     });
     tokens = [...new Set(tokens)];
-    if (!tokens.length) return res.status(200).json({ message: "No hay tokens de admin." });
+    if (!tokens.length) 
+      return res.status(200).json({ message: "No hay tokens de admin." });
 
     const payload = {
       notification: {
@@ -185,24 +187,38 @@ export default async function handler(req, res) {
         url: notificationData.url,
         type: notificationData.type,
         timestamp: Date.now().toString(),
-        ...(notificationData.verseText && { verseText: notificationData.verseText }),
+        ...(notificationData.verseText    && { verseText: notificationData.verseText }),
         ...(notificationData.verseReference && { verseReference: notificationData.verseReference })
       }
     };
 
-
-
     console.log("Tokens admin a enviar:", tokens);
-if (!Array.isArray(tokens) || tokens.length === 0) {
-  console.warn("⚠️ No hay tokens de admin válidos.");
-  return res.status(200).json({ message: "No hay tokens de admin." });
-}
+    if (!Array.isArray(tokens) || tokens.length === 0) {
+      console.warn("⚠️ No hay tokens de admin válidos.");
+      return res.status(200).json({ message: "No hay tokens de admin." });
+    }
 
+    // Máximo de 500 tokens por petición
+    const BATCH_SIZE = 500;
+    let allResults = [];
 
-    const response = await admin.messaging().sendToDevice(tokens, payload);
-    return res.status(200).json({ ok: true, results: response.results });
+    for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+      const chunk = tokens.slice(i, i + BATCH_SIZE);
+      console.log(`Enviando lote ${i / BATCH_SIZE + 1} con ${chunk.length} tokens…`);
+      const resp = await admin.messaging().sendToDevice(chunk, payload);
+      allResults = allResults.concat(resp.results);
+    }
+
+    return res.status(200).json({
+      ok: true,
+      totalTokens: tokens.length,
+      batches: Math.ceil(tokens.length / BATCH_SIZE),
+      results: allResults
+    });
+
   } catch (err) {
     console.error("❌ Error enviando notificación a admins:", err);
     return res.status(500).json({ error: err.message });
   }
-}
+}  // <-- cierra tu función handler aquí
+
