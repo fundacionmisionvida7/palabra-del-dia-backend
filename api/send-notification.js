@@ -1,18 +1,27 @@
 // api/send-notification.js
+
 import admin from "../firebaseAdmin.js";
 import { promises as fs } from "fs";
 
+// Initialize admin app (only once)
+if (!admin.apps.length) {
+  // Assumes you have a serviceAccountKey.json at project root
+  admin.initializeApp({
+    credential: admin.credential.cert(
+      JSON.parse(await fs.readFile("./serviceAccountKey.json", "utf-8"))
+    )
+  });
+}
 
-// Al principio de send-notification.js
+const db = admin.firestore();
+
+// Helper: fetch SW version for “update” notifications
 async function getSWVersion() {
   try {
-    // 1) URL pública de tu Service Worker en Firebase Hosting:
     const url = 'https://mision-vida-app.web.app/service-worker.js';
-    // 2) Fetch remoto
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const code = await resp.text();
-    // 3) Extraer la versión con regex
     const m = code.match(/const\s+SW_VERSION\s*=\s*['"]([^'"]+)['"]/);
     return m ? m[1] : 'desconocida';
   } catch (e) {
@@ -21,208 +30,171 @@ async function getSWVersion() {
   }
 }
 
-
-
 export default async function handler(req, res) {
-  // CORS
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  let notificationData = {};
-
-  if (req.method === "POST") {
-    notificationData = req.body || {};
-  } else if (req.method === "GET") {
+  let notificationData;
+  if (req.method === "GET") {
     const { type } = req.query;
-    console.log("📩 Solicitud GET recibida");
-    console.log(`🔔 Tipo de notificación: ${type}`);
-
-    if (type === "daily") {
-      notificationData = {
-        title: "📖 Palabra del Día",
-        body:  "¡Tu devocional de hoy ya está disponible!",
-        url:   "/",
-        type:  "daily"
-      };
-
-    } else if (type === "verse") {
-      try {
-        const jsonUrl = new URL("./data/versiculos.json", import.meta.url);
-        const file = await fs.readFile(jsonUrl, "utf-8");
-        const list = JSON.parse(file).versiculos;
-        const idx = Math.floor(Math.random() * list.length);
-        const verse = list[idx];
-
-notificationData = {
-  title:       "🙏 ¡Nuevo versículo del día!",
-  body:        verse.texto,
-  url:         "#versiculo",
-  type:        "verse",
-  // El texto del versículo
-  verseText:   verse.texto,
-  // Clave para la referencia, coincidente con tu cliente
-  referencia:  verse.referencia,
-  // Y muy importante: la versión de la Biblia
-  version:     verse.version  || verse.versionName  || "RVR1960"
-};
-
-      } catch (err) {
-        console.error("❌ Error leyendo versiculos.json:", err);
-        return res.status(500).json({ error: "Error al leer versiculos.json" });
+    switch (type) {
+      case "daily":
+        notificationData = {
+          title: "📖 Palabra del Día",
+          body:  "¡Tu devocional de hoy ya está disponible!",
+          url:   "/",
+          type:  "daily"
+        };
+        break;
+      case "verse": {
+        try {
+          const file = await fs.readFile(new URL("./data/versiculos.json", import.meta.url), "utf-8");
+          const list = JSON.parse(file).versiculos;
+          const verse = list[Math.floor(Math.random() * list.length)];
+          notificationData = {
+            title:       "🙏 ¡Nuevo versículo del día!",
+            body:        verse.texto,
+            url:         "#versiculo",
+            type:        "verse",
+            verseText:   verse.texto,
+            verseReference: verse.referencia,
+            version:     verse.version || "RVR1960"
+          };
+        } catch (err) {
+          console.error(err);
+          return res.status(500).json({ error: "Error leyendo versiculos.json" });
+        }
+        break;
       }
-
-    } else if (type === "event") {
-      notificationData = {
-        title: "🎉 ¡Nuevo evento!",
-        body:  "¡Ya está disponible el nuevo evento para ver!",
-        url:   "#eventos",
-        type:  "event"
-      };
-
-      
-     } else if (type === "news") {
-      notificationData = {
-        title: "📰 Atencion, Atencion!",
-        body:  `Hay nuevas noticias!`,
-        url:   "#noticias",
-        type:  "news"
-      };
-
-
-} else if (type === "update") {
-  const version = await getSWVersion();
-
-  notificationData = {
-    title:   "⚙️ ¡Nueva versión disponible!",
-    body:    `Se ha publicado la versión ${version}.`,
-    url:     "/",
-    type:    "update",
-    version,
-  };
-
-
-
-
-     
-
- } else if (type === "live") {
-    // ─────────── OJO AQUÍ ───────────
-    // 1) Consultar a YouTube si hay live
-    const YT_API_KEY = process.env.YT_API_KEY;
-    const CHANNEL_ID = process.env.YT_CHANNEL_ID;
-    const ytUrl = new URL('https://www.googleapis.com/youtube/v3/search');
-    ytUrl.search = new URLSearchParams({
-      part:       'snippet',
-      channelId:  CHANNEL_ID,
-      eventType:  'live',
-      type:       'video',
-      key:        YT_API_KEY
-    }).toString();
-
-    let liveLink = "#live";  // fallback al ancla
-    try {
-      const ytRes  = await fetch(ytUrl);
-      const ytData = await ytRes.json();
-      if (ytRes.ok && ytData.items?.length > 0) {
-        const vid = ytData.items[0].id.videoId;
-        liveLink = `https://www.youtube.com/watch?v=${vid}`;
+      case "event":
+        notificationData = {
+          title: "🎉 ¡Nuevo evento!",
+          body:  "¡Ya está disponible el nuevo evento para ver!",
+          url:   "#eventos",
+          type:  "event"
+        };
+        break;
+      case "news":
+        notificationData = {
+          title: "📰 ¡Hay noticias nuevas!",
+          body:  "Visita la sección de noticias para más información.",
+          url:   "#noticias",
+          type:  "news"
+        };
+        break;
+      case "update": {
+        const version = await getSWVersion();
+        notificationData = {
+          title:   "⚙️ ¡Nueva versión disponible!",
+          body:    `Se ha publicado la versión ${version}.`,
+          url:     "/",
+          type:    "update",
+          version
+        };
+        break;
       }
-    } catch (err) {
-      console.error('Error al consultar YouTube:', err);
+      case "live": {
+        const YT_API_KEY    = process.env.YT_API_KEY;
+        const CHANNEL_ID    = process.env.YT_CHANNEL_ID;
+        let liveLink        = "#live";
+        try {
+          const ytRes  = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${CHANNEL_ID}&eventType=live&type=video&key=${YT_API_KEY}`);
+          const ytData = await ytRes.json();
+          if (ytData.items?.length) {
+            liveLink = `https://www.youtube.com/watch?v=${ytData.items[0].id.videoId}`;
+          }
+        } catch (e) {
+          console.warn(e);
+        }
+        notificationData = {
+          title: "🎥 ¡Estamos en vivo!",
+          body:  "Únete a la transmisión del culto ahora mismo.",
+          url:   liveLink,
+          type:  "live"
+        };
+        break;
+      }
+      case "Culto":
+        notificationData = {
+          title: "🏚️ ¡Hoy hay culto!",
+          body:  "¡Te esperamos en casa de vida hoy!",
+          url:   "#Culto",
+          type:  "Culto"
+        };
+        break;
+      case "CultoEspecial":
+        notificationData = {
+          title: "⛪ ¡Culto Especial hoy!",
+          body:  "¡No te pierdas la reunión especial!",
+          url:   "#CultoEspecial",
+          type:  "CultoEspecial"
+        };
+        break;
+      case "Contacto":
+        notificationData = {
+          title: "📩 Nuevo mensaje de contacto",
+          body:  "Tienes un nuevo mensaje desde la web.",
+          url:   "#contacto",
+          type:  "Contacto"
+        };
+        break;
+      default:
+        return res.status(400).json({ error: "Tipo de notificación inválido" });
     }
-
-    // 2) Ahora sí armar notificationData usando liveLink dinámico
-    notificationData = {
-      title: "🎥 ¡Estamos en vivo!",
-      body:  "Únete a la transmisión del culto ahora mismo.",
-      url:   liveLink,        // ← aquí va la URL real o el ancla
-      type:  "live"
-    };
-
-
-
-  } else if (type === "Culto") {
-      notificationData = {
-        title: "🏚️ ¡Hoy hay culto!",
-        body:  "¡Hoy nos vemos en casa, te esperamos!",
-        url:   "#Culto",
-        type:  "Culto"
-      };
-
-
-
-  } else if (type === "CultoEspecial") {
-      notificationData = {
-        title: "⛪ ¡Hoy hay culto!",
-        body:  "¡Hoy tenemos reunion Especial, nos vemos en casa, te esperamos!",
-        url:   "#CultoEspecial",
-        type:  "CultoEspecial"
-      };
-
-
-
-
-    } else {
-      return res.status(400).json({ error: "Tipo de notificación inválido" });
-    }
-
   } else {
     return res.status(405).json({ error: "Método no permitido" });
   }
 
- const { title, body, type: notifType } = notificationData;
+  // Determine topic to send to only admin tokens
+  const topicMap = {
+    daily:         "daily",
+    verse:         "verse",
+    event:         "event",
+    live:          "live",
+    news:          "news",
+    update:        "updates",
+    Culto:         "Culto",
+    CultoEspecial: "CultoEspecial",
+    Contacto:      "Contacto"
+  };
+  const topic = topicMap[notificationData.type];
+  if (!topic) return res.status(400).json({ error: "Topic no configurado para este tipo" });
 
-// Mapeo de tipo → topic
-const topicMap = {
-  daily:          "daily",
-  verse:          "verse",
-  event:          "event",
-  live:           "live",
-  news:           "news",
-  update:         "updates",       // ← ya estaba
-  Culto:           "Culto",
-  CultoEspecial:   "CultoEspecial"
-};
+  // Fetch admin user tokens
+  try {
+    const adminsSnap = await db.collection("users")
+      .where("role", "==", "admin")
+      .get();
 
-const topic = topicMap[notifType];
-if (!topic) {
-  return res.status(400).json({ error: `Tipo no válido para topic: ${notifType}` });
+    let tokens = [];
+    adminsSnap.forEach(doc => {
+      const u = doc.data();
+      if (Array.isArray(u.tokens)) tokens.push(...u.tokens);
+    });
+    tokens = [...new Set(tokens)];
+    if (!tokens.length) return res.status(200).json({ message: "No hay tokens de admin." });
+
+    const payload = {
+      notification: {
+        title: notificationData.title,
+        body:  notificationData.body
+      },
+      data: {
+        url: notificationData.url,
+        type: notificationData.type,
+        timestamp: Date.now().toString(),
+        ...(notificationData.verseText && { verseText: notificationData.verseText }),
+        ...(notificationData.verseReference && { verseReference: notificationData.verseReference })
+      }
+    };
+
+    const response = await admin.messaging().sendToDevice(tokens, payload);
+    return res.status(200).json({ ok: true, results: response.results });
+  } catch (err) {
+    console.error("❌ Error enviando notificación a admins:", err);
+    return res.status(500).json({ error: err.message });
+  }
 }
-
-// Armado del dataPayload (incluimos aquí también icon y demás)
-const dataPayload = {
-  title:     String(title),
-  body:      String(body),
-  icon:      "https://mision-vida-app.web.app/icon.png",
-  url:       String(notificationData.url || "/"),
-  type:      String(notificationData.type || "unknown"),
-  timestamp: Date.now().toString()
-};
-if (notificationData.verseText) {
-  dataPayload.verseText = String(notificationData.verseText);
-}
-if (notificationData.verseReference) {
-  dataPayload.verseReference = String(notificationData.verseReference);
-}
-
-try {
-  const message = {
-    topic,
-    data: dataPayload
-};
-
-
-
-  console.log(`🚀 Enviando notificación a topic "${topic}" vía HTTP v1…`);
-  const response = await admin.messaging().send(message);
-  console.log(`✅ Notificación enviada correctamente:`, response);
-
-  return res.status(200).json({ ok: true, topic, response });
-
-} catch (err) {
-  console.error("❌ Error enviando al topic:", err);
-  return res.status(500).json({ error: err.message });
-}
-};
