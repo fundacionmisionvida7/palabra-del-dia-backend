@@ -1,7 +1,6 @@
 // api/cleanup-fcm-tokens.js
 import admin from 'firebase-admin';
 
-// Inicializa Firebase Admin con tu Service Account
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -17,30 +16,49 @@ const messaging = admin.messaging();
 
 export default async function handler(req, res) {
   try {
-    const usuariosSnapshot = await db.collection('users').get();
+    // 1. Recupera todos los usuarios
+    const usuariosSnap = await db.collection('users').get();
 
-    for (const userDoc of usuariosSnapshot.docs) {
+    for (const userDoc of usuariosSnap.docs) {
       const uid = userDoc.id;
-      const tokensRef = db.collection('fcmTokens')
-                          .where('uid', '==', uid)
-                          .orderBy('createdAt', 'desc');
+      const tokensRef = db
+        .collection('users')
+        .doc(uid)
+        .collection('tokens')
+        .orderBy('createdAt', 'desc'); // asume que cada tokenDoc tiene campo createdAt
       const tokensSnap = await tokensRef.get();
 
       let keeper = null;
+      // 2. Valida y elige keeper
       for (const tokenDoc of tokensSnap.docs) {
         const token = tokenDoc.id;
-        // dryRun valida sin enviar notificación real
         try {
-          await messaging.sendToDevice(token, { notification: { title: 'ping' } }, { dryRun: true });
-          if (!keeper) {
-            keeper = token;  // primer token válido
-          } else {
-            await db.collection('fcmTokens').doc(token).delete();
-          }
-        } catch (err) {
-          // token inválido o no registrado, elimínalo
-          await db.collection('fcmTokens').doc(token).delete();
+          await messaging.sendToDevice(
+            token,
+            { notification: { title: 'ping' } },
+            { dryRun: true }
+          );
+          if (!keeper) keeper = token;
+          // si ya hay keeper, lo eliminamos de users/{uid}/tokens
+          else await tokenDoc.ref.delete();
+        } catch {
+          // token inválido, lo borramos
+          await tokenDoc.ref.delete();
         }
+      }
+
+      // 3. (Opcional) Asegurarte de conservar always el más reciente aunque falle:
+      // if (!keeper && tokensSnap.docs[0]) {
+      //   keeper = tokensSnap.docs[0].id;
+      //   // opcionalmente: moverlo a fcmTokens
+      // }
+
+      // 4. Actualiza colección fcmTokens (opcional)
+      if (keeper) {
+        await db
+          .collection('fcmTokens')
+          .doc(keeper)
+          .set({ uid, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
       }
     }
 
