@@ -1,0 +1,15 @@
+name: Limpieza diaria de FCM Tokens
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # todos los días a las 03:00 UTC (00:00 Argentina)
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a la función de limpieza
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ secrets.CLEANUP_URL }}  # URL de tu endpoint Vercel
+          method: 'POST'
