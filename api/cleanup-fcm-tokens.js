@@ -16,22 +16,19 @@ const messaging = admin.messaging();
 
 export default async function handler(req, res) {
   try {
-    // 1. Recupera todos los usuarios
-    const usuariosSnap = await db.collection('users').get();
+    const usersSnap = await db.collection('users').get();
 
-    for (const userDoc of usuariosSnap.docs) {
+    for (const userDoc of usersSnap.docs) {
       const uid = userDoc.id;
-      const tokensRef = db
-        .collection('users')
-        .doc(uid)
-        .collection('tokens')
-        .orderBy('createdAt', 'desc'); // asume que cada tokenDoc tiene campo createdAt
-      const tokensSnap = await tokensRef.get();
+      const data = userDoc.data();
+      const allTokens = Array.isArray(data.tokens) ? data.tokens : [];
+
+      if (allTokens.length === 0) continue;
 
       let keeper = null;
-      // 2. Valida y elige keeper
-      for (const tokenDoc of tokensSnap.docs) {
-        const token = tokenDoc.id;
+
+      // 1) Validar cada token con dryRun
+      for (const token of allTokens) {
         try {
           await messaging.sendToDevice(
             token,
@@ -39,27 +36,24 @@ export default async function handler(req, res) {
             { dryRun: true }
           );
           if (!keeper) keeper = token;
-          // si ya hay keeper, lo eliminamos de users/{uid}/tokens
-          else await tokenDoc.ref.delete();
-        } catch {
-          // token inválido, lo borramos
-          await tokenDoc.ref.delete();
+        } catch (err) {
+          // token inválido: lo ignoramos (no será añadido al nuevo array)
         }
       }
 
-      // 3. (Opcional) Asegurarte de conservar always el más reciente aunque falle:
-      // if (!keeper && tokensSnap.docs[0]) {
-      //   keeper = tokensSnap.docs[0].id;
-      //   // opcionalmente: moverlo a fcmTokens
-      // }
+      // 2) Si ninguno pasó la validación, conserva el primero (más reciente)
+      if (!keeper) keeper = allTokens[0];
 
-      // 4. Actualiza colección fcmTokens (opcional)
-      if (keeper) {
-        await db
-          .collection('fcmTokens')
-          .doc(keeper)
-          .set({ uid, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-      }
+      // 3) Reescribe el campo `tokens` dejando solo el keeper
+      await userDoc.ref.update({
+        tokens: [keeper]
+      });
+
+      // 4) (Opcional) Actualiza tu colección fcmTokens
+      await db
+        .collection('fcmTokens')
+        .doc(keeper)
+        .set({ uid, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     }
 
     return res.status(200).json({ success: true });
