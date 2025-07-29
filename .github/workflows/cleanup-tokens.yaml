@@ -18,8 +18,6 @@ jobs:
           url: ${{ secrets.CLEANUP_URL }}
           method: 'POST'
           contentType: 'application/json'
-          customHeaders: |
-            Content-Type: application/json
           timeout: 20000  # Aumenta el timeout para evitar fallos por tiempo de espera
 
       - name: Verificar respuesta
