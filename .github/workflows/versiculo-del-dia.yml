@@ -2,20 +2,121 @@ name: Versículo del Día
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # 7:00 UTC → 07:00 Argentina
+    - cron: '0 7 * * *'  # 7:00 UTC → 07:00 Argentina
   workflow_dispatch:
 
 jobs:
   push:
     runs-on: ubuntu-latest
     steps:
-      - name: Enviar versículo del día
+      - name: Warm-up del backend
         run: |
-          curl -v -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse" \
-            -H "Content-Type: application/json" \
-            -H "User-Agent: Mozilla/5.0 (GitHub Actions)" \
-            --retry 3 \
-            --retry-delay 5 \
+          echo "🔥 Calentando backend para evitar cold start..."
+          WARMUP_RESPONSE=$(curl -s -w "\n%{http_code}" \
+            "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse" \
             --connect-timeout 30 \
-            --max-time 60
-        timeout-minutes: 3
+            --max-time 45)
+          
+          WARMUP_HTTP_CODE=$(echo "$WARMUP_RESPONSE" | tail -n1)
+          echo "📡 Status del warm-up: $WARMUP_HTTP_CODE"
+          
+          if [ "$WARMUP_HTTP_CODE" -eq 200 ]; then
+            echo "✅ Warm-up exitoso"
+          else
+            echo "⚠️ Warm-up no óptimo, pero continuando..."
+          fi
+          
+          echo "⏳ Esperando 15 segundos antes del request real..."
+          sleep 15
+
+      - name: Enviar versículo del día con reintentos robustos
+        run: |
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          SUCCESS=false
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ "$SUCCESS" = "false" ]; do
+            echo "🔔 Intento $((RETRY_COUNT + 1)) de $MAX_RETRIES para enviar notificación..."
+            
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+              "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse" \
+              -H "Content-Type: application/json" \
+              -H "User-Agent: GitHub-Actions-Versiculo-Diario/1.0" \
+              --connect-timeout 60 \
+              --max-time 120 \
+              --retry 2 \
+              --retry-delay 10 \
+              --retry-max-time 300)
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
+            
+            echo "📡 Código HTTP: $HTTP_CODE"
+            echo "📦 Respuesta del servidor: $RESPONSE_BODY"
+            
+            if [ "$HTTP_CODE" -eq 200 ]; then
+              echo "✅ Notificación enviada exitosamente en el intento $((RETRY_COUNT + 1))"
+              echo "📋 Detalles: $RESPONSE_BODY"
+              SUCCESS=true
+            else
+              echo "❌ Error en el intento $((RETRY_COUNT + 1)) - HTTP: $HTTP_CODE"
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                RETRY_DELAY=$((30 * RETRY_COUNT))
+                echo "⏳ Esperando $RETRY_DELAY segundos antes del próximo intento..."
+                sleep $RETRY_DELAY
+              fi
+            fi
+          done
+          
+          if [ "$SUCCESS" = "false" ]; then
+            echo "💥 Todos los $MAX_RETRIES intentos fallaron"
+            echo "🚨 La notificación del versículo del día NO se envió"
+            exit 1
+          fi
+        timeout-minutes: 5
+
+      - name: Notificar éxito
+        if: success()
+        run: |
+          echo "🎉 Notificación del versículo del día enviada correctamente"
+          echo "🕐 Timestamp: $(date -u)"
+          echo "✅ Proceso completado exitosamente"
+
+      - name: Debug en caso de falla
+        if: failure()
+        run: |
+          echo "🔍 Información de debug para diagnóstico:"
+          echo "=========================================="
+          echo "URL del endpoint: https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse"
+          echo "Hora del error: $(date -u)"
+          echo "Último estado del servicio:"
+          
+          # Verificar conectividad básica
+          echo "📡 Verificando conectividad..."
+          ping -c 3 nuevo-palabra-del-dia-backend.vercel.app || echo "❌ No se pudo hacer ping"
+          
+          echo "🔗 Verificando respuesta HTTP..."
+          curl -I -X GET \
+            "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=verse" \
+            --connect-timeout 10 \
+            --max-time 15 || echo "❌ No se pudo conectar al endpoint"
+          
+          echo "=========================================="
+          echo "⚠️ Posibles causas:"
+          echo "   - Cold start del servidor en Vercel"
+          echo "   - Timeout en la respuesta"
+          echo "   - Error interno del backend"
+          echo "   - Problemas de red temporales"
+
+      - name: Notificar fallo completo
+        if: failure()
+        run: |
+          echo "🚨 FALLO CRÍTICO: El envío automático del versículo del día falló"
+          echo "🕐 Hora: $(date -u)"
+          echo "🔧 Se requiere intervención manual para investigar los logs"
+          echo "📋 Revisar:"
+          echo "   - Logs de Vercel"
+          echo "   - Estado del servicio"
+          echo "   - Configuración de variables de entorno"
