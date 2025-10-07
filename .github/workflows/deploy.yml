@@ -14,17 +14,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install dependencies
-        run: npm ci
-
-      # Si tu backend no necesita build, comenta o borra estas dos líneas:
-      # - name: Build project
-      #   run: npm run build
-
       - name: Deploy to Vercel
         run: npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
 
       - name: Send Update Notification via FCM
         run: |
-          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=update" \
-            -H "Content-Type: application/json"
+          echo "🔔 Enviando notificación de actualización..."
+          curl -X GET "https://nuevo-palabra-del-dia-backend.vercel.app/api/send-notification?type=update"
