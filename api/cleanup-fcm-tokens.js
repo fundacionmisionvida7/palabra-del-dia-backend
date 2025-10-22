@@ -1,8 +1,22 @@
 // api/cleanup-fcm-tokens.js
 import { MongoClient } from 'mongodb';
+import admin from 'firebase-admin';
 
-const MONGODB_URI = process.env.MONGODB_URI;
-const DB_NAME = process.env.DB_NAME || 'palabra_dia';
+// Inicializar Firebase Admin
+function initializeFirebaseAdmin() {
+  if (!admin.apps.length) {
+    const serviceAccount = {
+      projectId: process.env.FCM_PROJECT_ID,
+      clientEmail: process.env.FCM_CLIENT_EMAIL,
+      privateKey: process.env.FCM_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    };
+    
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+  }
+  return admin;
+}
 
 export default async function handler(req, res) {
   // Configurar CORS
@@ -10,12 +24,10 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Manejar preflight request
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Solo permitir POST
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false, 
@@ -26,51 +38,88 @@ export default async function handler(req, res) {
   let client;
 
   try {
-    console.log('🧹 Iniciando limpieza de FCM tokens...');
+    console.log('🧹 Iniciando limpieza de tokens FCM inválidos...');
 
-    // Verificar que MONGODB_URI existe
-    if (!MONGODB_URI) {
-      throw new Error('MONGODB_URI no está configurada en las variables de entorno');
+    // Verificar variables de entorno
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI no está configurada');
+    }
+    if (!process.env.FCM_PROJECT_ID) {
+      throw new Error('FCM_PROJECT_ID no está configurada');
     }
 
+    // Inicializar Firebase Admin
+    const admin = initializeFirebaseAdmin();
+    
     // Conectar a MongoDB
-    client = new MongoClient(MONGODB_URI);
+    client = new MongoClient(process.env.MONGODB_URI);
     await client.connect();
-    const db = client.db(DB_NAME);
+    const db = client.db(process.env.DB_NAME || 'palabra_dia');
 
-    console.log('✅ Conectado a MongoDB, limpiando tokens...');
+    // Obtener todos los usuarios con tokens FCM
+    const users = await db.collection('users').find({
+      fcmTokens: { $exists: true, $ne: [] }
+    }).toArray();
 
-    // Limpiar tokens FCM de todos los usuarios
-    const result = await db.collection('users').updateMany(
-      { 
-        fcmTokens: { 
-          $exists: true, 
-          $ne: [] // Solo actualizar usuarios que tienen tokens
-        } 
-      },
-      { 
-        $set: { 
-          fcmTokens: [],
-          lastCleanup: new Date()
-        } 
+    console.log(`📊 Usuarios con tokens: ${users.length}`);
+
+    let totalRemoved = 0;
+    let totalChecked = 0;
+
+    // Verificar cada token y eliminar los inválidos
+    for (const user of users) {
+      const validTokens = [];
+      const tokensToCheck = user.fcmTokens || [];
+
+      for (const token of tokensToCheck) {
+        try {
+          // Verificar si el token es válido enviando un mensaje de prueba
+          await admin.messaging().send({
+            token: token,
+            data: {
+              type: 'validation',
+              timestamp: Date.now().toString()
+            }
+          }, true); // dryRun: true - no envía realmente la notificación
+          
+          // Si no hay error, el token es válido
+          validTokens.push(token);
+          console.log(`✅ Token válido: ${token.substring(0, 20)}...`);
+        } catch (error) {
+          // Si hay error, el token es inválido
+          console.log(`❌ Token inválido removido: ${token.substring(0, 20)}... - Error: ${error.errorInfo?.code}`);
+          totalRemoved++;
+        }
+        totalChecked++;
       }
-    );
 
-    console.log(`✅ Limpieza completada. Usuarios afectados: ${result.modifiedCount}`);
+      // Actualizar el usuario con solo los tokens válidos
+      if (validTokens.length !== tokensToCheck.length) {
+        await db.collection('users').updateOne(
+          { _id: user._id },
+          { $set: { fcmTokens: validTokens } }
+        );
+        console.log(`🔄 Usuario ${user._id} actualizado: ${tokensToCheck.length} → ${validTokens.length} tokens`);
+      }
+    }
 
-    // Respuesta exitosa
+    console.log(`🎉 Limpieza completada: ${totalRemoved} tokens inválidos removidos de ${totalChecked} verificados`);
+
     return res.status(200).json({
       success: true,
-      message: 'Limpieza de tokens FCM completada exitosamente',
-      usersAffected: result.modifiedCount,
-      matchedUsers: result.matchedCount,
+      message: 'Limpieza de tokens FCM inválidos completada',
+      stats: {
+        usersProcessed: users.length,
+        tokensChecked: totalChecked,
+        invalidTokensRemoved: totalRemoved,
+        validTokensRemaining: totalChecked - totalRemoved
+      },
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
     console.error('❌ Error en limpieza FCM:', error);
     
-    // Respuesta de error detallada
     return res.status(500).json({
       success: false,
       error: 'Error interno del servidor',
@@ -78,7 +127,6 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     });
   } finally {
-    // Cerrar conexión de MongoDB
     if (client) {
       await client.close();
       console.log('🔌 Conexión a MongoDB cerrada');
