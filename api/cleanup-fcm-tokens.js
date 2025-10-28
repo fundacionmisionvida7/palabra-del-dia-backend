@@ -30,6 +30,139 @@ async function validateToken(token) {
   }
 }
 
+
+// api/cleanup-fcm-tokens.js - AGREGAR DESPUÉS DE validateToken
+
+// Función para limpiar tokens inválidos de la colección fcmTokens
+async function cleanupInvalidFcmTokens() {
+  try {
+    console.log('🧹 BUSCANDO TOKENS INVÁLIDOS EN COLECCIÓN fcmTokens...');
+    
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    
+    // 1. Buscar tokens muy antiguos (más de 1 mes)
+    const oldTokensSnapshot = await db.collection('fcmTokens')
+      .where('updatedAt', '<', oneMonthAgo)
+      .get();
+
+    console.log(`📅 Tokens antiguos encontrados: ${oldTokensSnapshot.size}`);
+    
+    let deletedOldTokens = 0;
+    const batch = db.batch();
+    
+    // Eliminar tokens antiguos
+    oldTokensSnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedOldTokens++;
+    });
+    
+    if (deletedOldTokens > 0) {
+      await batch.commit();
+      console.log(`🗑️ Eliminados ${deletedOldTokens} tokens antiguos`);
+    }
+    
+    // 2. Buscar tokens marcados como inválidos
+    const invalidTokensSnapshot = await db.collection('fcmTokens')
+      .where('isValid', '==', false)
+      .get();
+    
+    console.log(`❌ Tokens inválidos encontrados: ${invalidTokensSnapshot.size}`);
+    
+    let deletedInvalidTokens = 0;
+    const batch2 = db.batch();
+    
+    invalidTokensSnapshot.forEach(doc => {
+      batch2.delete(doc.ref);
+      deletedInvalidTokens++;
+    });
+    
+    if (deletedInvalidTokens > 0) {
+      await batch2.commit();
+      console.log(`🗑️ Eliminados ${deletedInvalidTokens} tokens inválidos`);
+    }
+    
+    // 3. Buscar tokens sin UID (huérfanos)
+    const orphanTokensSnapshot = await db.collection('fcmTokens')
+      .where('uid', '==', null)
+      .limit(100) // Limitar para no sobrecargar
+      .get();
+    
+    console.log(`👻 Tokens huérfanos encontrados: ${orphanTokensSnapshot.size}`);
+    
+    let deletedOrphanTokens = 0;
+    const batch3 = db.batch();
+    
+    orphanTokensSnapshot.forEach(doc => {
+      batch3.delete(doc.ref);
+      deletedOrphanTokens++;
+    });
+    
+    if (deletedOrphanTokens > 0) {
+      await batch3.commit();
+      console.log(`🗑️ Eliminados ${deletedOrphanTokens} tokens huérfanos`);
+    }
+    
+    return {
+      deletedOldTokens,
+      deletedInvalidTokens,
+      deletedOrphanTokens,
+      totalDeleted: deletedOldTokens + deletedInvalidTokens + deletedOrphanTokens
+    };
+    
+  } catch (error) {
+    console.error('❌ Error limpiando colección fcmTokens:', error);
+    return { error: error.message };
+  }
+}
+
+// Función para sincronizar fcmTokens con users
+async function syncFcmTokensWithUsers() {
+  try {
+    console.log('🔄 SINCRONIZANDO COLECCIÓN fcmTokens CON users...');
+    
+    const usersSnap = await db.collection('users').get();
+    const allValidTokens = new Set();
+    
+    // Recolectar todos los tokens válidos de users
+    usersSnap.forEach(userDoc => {
+      const tokens = userDoc.data().tokens || [];
+      tokens.forEach(token => allValidTokens.add(token));
+    });
+    
+    console.log(`📊 Tokens válidos en users: ${allValidTokens.size}`);
+    
+    // Obtener todos los documentos de fcmTokens
+    const fcmTokensSnap = await db.collection('fcmTokens').get();
+    console.log(`📋 Documentos en fcmTokens: ${fcmTokensSnap.size}`);
+    
+    let orphanFcmTokens = 0;
+    const batch = db.batch();
+    
+    // Eliminar tokens de fcmTokens que no están en users
+    fcmTokensSnap.forEach(doc => {
+      const tokenData = doc.data();
+      if (!allValidTokens.has(doc.id)) {
+        batch.delete(doc.ref);
+        orphanFcmTokens++;
+      }
+    });
+    
+    if (orphanFcmTokens > 0) {
+      await batch.commit();
+      console.log(`🗑️ Eliminados ${orphanFcmTokens} tokens huérfanos de fcmTokens`);
+    } else {
+      console.log('✅ No hay tokens huérfanos en fcmTokens');
+    }
+    
+    return { orphanFcmTokens };
+    
+  } catch (error) {
+    console.error('❌ Error sincronizando fcmTokens:', error);
+    return { error: error.message };
+  }
+}
+
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -62,13 +195,7 @@ export default async function handler(req, res) {
         const allTokens = Array.isArray(userData.tokens) ? userData.tokens : [];
         
         console.log(`👤 Procesando usuario ${uid}: ${allTokens.length} tokens`);
-        
-        // Verificar si es el usuario admin (puedes ajustar esta condición)
-       // if (userData.email && userData.email.includes('admin') || userData.role === 'admin') {
-        //  console.log(`⭐ USUARIO ADMIN DETECTADO: ${userData.email || uid}`);
-       //   adminProcessed = true;
-      //  }
-
+    
         // Busca esta línea y ajústala:
         if (userData.email && userData.email.includes('admin') || userData.role === 'admin' || uid === 'ZqyiPJtJ74YyEZ1WSD9xOlGhKue2') {
         console.log(`⭐ USUARIO ADMIN DETECTADO: ${userData.email || uid}`);
@@ -159,19 +286,46 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log('🎉 LIMPIEZA COMPLETADA');
-    console.log(`📊 Resumen:`);
+
+    console.log('🎉 LIMPIEZA DE USUARIOS COMPLETADA');
+    console.log(`📊 Resumen usuarios:`);
     console.log(`   👥 Usuarios procesados: ${totalProcessed}`);
     console.log(`   🧹 Usuarios limpiados: ${totalCleaned}`);
     console.log(`   ⭐ Admin procesado: ${adminProcessed ? '✅' : '❌'}`);
 
+    // 🔥 NUEVO: LIMPIAR COLECCIÓN fcmTokens
+    console.log('\n🔥 INICIANDO LIMPIEZA DE COLECCIÓN fcmTokens...');
+    
+    // 1. Limpiar tokens inválidos/antiguos
+    const fcmCleanupResult = await cleanupInvalidFcmTokens();
+    
+    // 2. Sincronizar fcmTokens con users
+    const syncResult = await syncFcmTokensWithUsers();
+    
+    console.log('🎊 LIMPIEZA COMPLETA FINALIZADA');
+    console.log(`📊 RESUMEN FINAL:`);
+    console.log(`   👥 Usuarios procesados: ${totalProcessed}`);
+    console.log(`   🧹 Usuarios limpiados: ${totalCleaned}`);
+    console.log(`   🗑️  Tokens eliminados de fcmTokens: ${fcmCleanupResult.totalDeleted || 0}`);
+    console.log(`   🔄 Tokens huérfanos eliminados: ${syncResult.orphanFcmTokens || 0}`);
+    console.log(`   ⭐ Admin procesado: ${adminProcessed ? '✅' : '❌'}`);
+
     res.status(200).json({
       success: true,
-      message: 'Limpieza completada',
+      message: 'Limpieza completa finalizada',
       stats: {
-        totalUsers: totalProcessed,
-        cleanedUsers: totalCleaned,
-        adminProcessed: adminProcessed,
+        users: {
+          totalProcessed: totalProcessed,
+          cleaned: totalCleaned,
+          adminProcessed: adminProcessed
+        },
+        fcmTokens: {
+          deletedOld: fcmCleanupResult.deletedOldTokens || 0,
+          deletedInvalid: fcmCleanupResult.deletedInvalidTokens || 0,
+          deletedOrphans: fcmCleanupResult.deletedOrphanTokens || 0,
+          syncOrphans: syncResult.orphanFcmTokens || 0,
+          totalDeleted: (fcmCleanupResult.totalDeleted || 0) + (syncResult.orphanFcmTokens || 0)
+        },
         timestamp: new Date().toISOString()
       }
     });
