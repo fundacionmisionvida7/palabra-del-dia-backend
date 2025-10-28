@@ -64,9 +64,15 @@ export default async function handler(req, res) {
         console.log(`👤 Procesando usuario ${uid}: ${allTokens.length} tokens`);
         
         // Verificar si es el usuario admin (puedes ajustar esta condición)
-        if (userData.email && userData.email.includes('admin') || userData.role === 'admin') {
-          console.log(`⭐ USUARIO ADMIN DETECTADO: ${userData.email || uid}`);
-          adminProcessed = true;
+       // if (userData.email && userData.email.includes('admin') || userData.role === 'admin') {
+        //  console.log(`⭐ USUARIO ADMIN DETECTADO: ${userData.email || uid}`);
+       //   adminProcessed = true;
+      //  }
+
+        // Busca esta línea y ajústala:
+        if (userData.email && userData.email.includes('admin') || userData.role === 'admin' || uid === 'ZqyiPJtJ74YyEZ1WSD9xOlGhKue2') {
+        console.log(`⭐ USUARIO ADMIN DETECTADO: ${userData.email || uid}`);
+        adminProcessed = true;
         }
 
         if (allTokens.length === 0) {
