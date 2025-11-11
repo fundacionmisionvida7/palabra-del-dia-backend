@@ -1,0 +1,40 @@
+name: Test Notifications
+
+on:
+  workflow_dispatch:  # Permite ejecución manual
+    inputs:
+      test_type:
+        description: 'Tipo de notificación a probar'
+        required: true
+        default: 'daily'
+        type: choice
+        options:
+        - daily
+        - verse
+        - live
+        - update
+        - event
+
+jobs:
+  test-notification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Notification
+        run: |
+          RESPONSE=$(curl -s -X POST "https://tu-app.vercel.app/api/test-notification" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "token": "${{ secrets.TEST_FCM_TOKEN }}",
+              "type": "${{ github.event.inputs.test_type }}"
+            }')
+          
+          echo "Response: $RESPONSE"
+          
+          # Verificar si fue exitoso
+          if echo "$RESPONSE" | grep -q '"ok":true'; then
+            echo "✅ Test exitoso"
+            exit 0
+          else
+            echo "❌ Test falló"
+            exit 1
+          fi
