@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-
+// //
 // --------------------------------------------------------------------
 // NOTA: la tarea diaria que guarda el devocional en Supabase (para
 // tener una fecha estable de Argentina) NO vive en un archivo aparte,
