@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import { JSDOM } from 'jsdom';
-// //
+
 // --------------------------------------------------------------------
 // NOTA: la tarea diaria que guarda el devocional en Supabase (para
 // tener una fecha estable de Argentina) NO vive en un archivo aparte,
@@ -15,19 +15,34 @@ const SUPABASE_URL = 'https://ltwglqcqflakkjuuyhrg.supabase.co';
 const SUPABASE_BUCKET = 'devocionales';
 const SUPABASE_FILE = 'hoy.json';
 
-// Fecha de HOY en Argentina, sin importar en qué huso horario esté
-// corriendo el servidor de Vercel (normalmente corre en UTC).
-function getArgentinaDateString() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(new Date());
+// FIX: en vez de adivinar a qué hora bibliaon.com rota su contenido
+// (se probó con las 20:00 hora Argentina y no fue exacto, rota en
+// horarios variables), ahora se lee la fecha que la PROPIA página
+// dice tener (ej: "JUEVES, 9 DE JULIO DE 2026", justo arriba del
+// título). Así siempre se guarda con la fecha real y verdadera del
+// contenido, sin adivinar nada.
+const MESES_ES = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+};
 
-  const map = {};
-  for (const p of parts) map[p.type] = p.value;
-  return `${map.year}-${map.month}-${map.day}`; // "YYYY-MM-DD"
+function quitarAcentos(texto) {
+  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Busca un patrón tipo "9 DE JULIO DE 2026" en el texto de la página
+// y lo convierte a "2026-07-09". Devuelve null si no lo encuentra.
+function extraerFechaDePagina(texto) {
+  const match = quitarAcentos(texto).match(/(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/i);
+  if (!match) return null;
+
+  const dia = parseInt(match[1], 10);
+  const mes = MESES_ES[match[2].toLowerCase()];
+  const anio = parseInt(match[3], 10);
+
+  if (!mes) return null;
+
+  return `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
 }
 
 async function guardarEnSupabase(devotionalResult) {
@@ -36,7 +51,9 @@ async function guardarEnSupabase(devotionalResult) {
     throw new Error('Falta configurar la variable de entorno SUPABASE_SERVICE_ROLE_KEY en Vercel');
   }
 
-  const today = getArgentinaDateString();
+  // La fecha del snapshot es la fecha REAL del contenido (la que la
+  // propia página declaró), no una calculada por nosotros.
+  const today = devotionalResult.date;
   const snapshot = {
     date: today,
     title: devotionalResult.title,
@@ -124,9 +141,13 @@ export default async function handler(req, res) {
       throw new Error('Contenido insuficiente después de la limpieza');
     }
 
-    // 5. Fecha formateada (YYYY-MM-DD) — la del servidor (UTC), se
-    //    mantiene igual que antes para no romper nada que ya la use.
-    const formattedDate = new Date().toISOString().split('T')[0];
+    // 5. Fecha REAL del contenido: se busca en el texto de la página
+    //    (ej: "JUEVES, 9 DE JULIO DE 2026") en vez de calcularla con el
+    //    reloj del servidor. Si por algún motivo no se encuentra ese
+    //    texto (cambió el diseño de la página, etc.), se usa como
+    //    respaldo la fecha del servidor para no romper todo.
+    const fechaDeLaPagina = extraerFechaDePagina(document.body.textContent || '');
+    const formattedDate = fechaDeLaPagina || new Date().toISOString().split('T')[0];
 
     const devotionalResult = {
       title,
