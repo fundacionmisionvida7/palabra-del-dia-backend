@@ -108,18 +108,14 @@ export default async function handler(req, res) {
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
     if (!mainContent) throw new Error('Estructura de contenido no encontrada');
 
-    // 2. Extraer título REAL, buscando primero DENTRO del contenido
-    //    (para poder borrarlo del cuerpo y que no salga duplicado más
-    //    abajo, junto con el título destacado que arma la app)
+    // 2. Extraer título REAL (saltando encabezados genéricos)
     let title;
-    let elementoTitulo = null;
 
     const encabezadosDentro = Array.from(mainContent.querySelectorAll('h1, h2, h3, h4'));
     for (const h of encabezadosDentro) {
       const txt = h.textContent.trim();
       if (!txt || /^Palabra de (Hoy|Ayer|Anteayer)$/i.test(txt)) continue;
       title = txt;
-      elementoTitulo = h;
       break;
     }
 
@@ -147,11 +143,25 @@ export default async function handler(req, res) {
     // Eliminar listas vacías o de recomendación
     mainContent.querySelectorAll('ul, li').forEach(el => el.remove());
 
-    // FIX: eliminar el título del cuerpo del texto (si estaba adentro),
-    // para que no aparezca duplicado (una vez como título destacado y
-    // otra vez repetido dentro del contenido)
-    if (elementoTitulo && elementoTitulo.parentNode) {
-      elementoTitulo.remove();
+    // FIX: eliminar el título del cuerpo del texto, para que no salga
+    // duplicado (una vez como título destacado y otra vez repetido
+    // dentro del contenido). Antes solo se buscaba en h1-h4, pero el
+    // título repetido puede estar en cualquier otra etiqueta (un
+    // párrafo en negrita, un div, etc.) — así que ahora se busca CUALQUIER
+    // elemento cuyo texto coincida exactamente con el título, sin
+    // importar la etiqueta, y se elimina el primero que coincida.
+    const normalizar = (t) => (t || '').replace(/\s+/g, ' ').trim();
+    const tituloNormalizado = normalizar(title);
+    if (tituloNormalizado) {
+      const candidatosTitulo = Array.from(
+        mainContent.querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b, p, div, span')
+      );
+      for (const el of candidatosTitulo) {
+        if (normalizar(el.textContent) === tituloNormalizado) {
+          el.remove();
+          break;
+        }
+      }
     }
 
     // FIX: eliminar el bloque final "Lee también" y todo lo que venga
