@@ -108,7 +108,37 @@ export default async function handler(req, res) {
     const mainContent = document.querySelector('.daily-content') || document.querySelector('.entry-content');
     if (!mainContent) throw new Error('Estructura de contenido no encontrada');
 
-    // 2. Eliminar elementos no deseados (enlaces, scripts, anuncios, etc.)
+    // 2. Extraer título REAL, buscando primero DENTRO del contenido
+    //    (para poder borrarlo del cuerpo y que no salga duplicado más
+    //    abajo, junto con el título destacado que arma la app)
+    let title;
+    let elementoTitulo = null;
+
+    const encabezadosDentro = Array.from(mainContent.querySelectorAll('h1, h2, h3, h4'));
+    for (const h of encabezadosDentro) {
+      const txt = h.textContent.trim();
+      if (!txt || /^Palabra de (Hoy|Ayer|Anteayer)$/i.test(txt)) continue;
+      title = txt;
+      elementoTitulo = h;
+      break;
+    }
+
+    if (!title) {
+      // Respaldo: buscar en toda la página (comportamiento anterior,
+      // por si el título no está dentro del contenedor principal)
+      const h2s = Array.from(document.querySelectorAll('h2'));
+      for (const h2 of h2s) {
+        const txt = h2.textContent.trim();
+        if (/^Palabra de (Hoy|Ayer|Anteayer)$/i.test(txt)) continue;
+        title = txt;
+        break;
+      }
+    }
+    if (!title) {
+      title = document.querySelector('h1')?.textContent.trim() || 'Palabra del Día';
+    }
+
+    // 3. Eliminar elementos no deseados (enlaces, scripts, anuncios, etc.)
     const unwanted = [
       'script', 'style', '.ads', '.sharedaddy', '.post-tags', 'div[class*="promo"]',
       'p > a', 'a'
@@ -117,17 +147,27 @@ export default async function handler(req, res) {
     // Eliminar listas vacías o de recomendación
     mainContent.querySelectorAll('ul, li').forEach(el => el.remove());
 
-    // 3. Extraer título real (saltando encabezados genéricos)
-    let title;
-    const h2s = Array.from(document.querySelectorAll('h2'));
-    for (const h2 of h2s) {
-      const txt = h2.textContent.trim();
-      if (/^Palabra de (Hoy|Ayer|Anteayer)$/i.test(txt)) continue;
-      title = txt;
-      break;
+    // FIX: eliminar el título del cuerpo del texto (si estaba adentro),
+    // para que no aparezca duplicado (una vez como título destacado y
+    // otra vez repetido dentro del contenido)
+    if (elementoTitulo && elementoTitulo.parentNode) {
+      elementoTitulo.remove();
     }
-    if (!title) {
-      title = document.querySelector('h1')?.textContent.trim() || 'Palabra del Día';
+
+    // FIX: eliminar el bloque final "Lee también" y todo lo que venga
+    // después — es una llamada a otros artículos relacionados, no es
+    // parte del devocional en sí.
+    const bloques = Array.from(mainContent.querySelectorAll('p, div'));
+    for (const el of bloques) {
+      if (/lee\s+tambi[eé]n/i.test(el.textContent)) {
+        let actual = el;
+        while (actual) {
+          const siguiente = actual.nextElementSibling;
+          actual.remove();
+          actual = siguiente;
+        }
+        break;
+      }
     }
 
     // 4. Limpiar HTML restante (quitar clases, estilos, puntos suspensivos)
