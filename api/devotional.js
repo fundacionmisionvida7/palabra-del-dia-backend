@@ -145,11 +145,10 @@ export default async function handler(req, res) {
 
     // FIX: eliminar el título del cuerpo del texto, para que no salga
     // duplicado (una vez como título destacado y otra vez repetido
-    // dentro del contenido). Antes solo se buscaba en h1-h4, pero el
-    // título repetido puede estar en cualquier otra etiqueta (un
-    // párrafo en negrita, un div, etc.) — así que ahora se busca CUALQUIER
-    // elemento cuyo texto coincida exactamente con el título, sin
-    // importar la etiqueta, y se elimina el primero que coincida.
+    // dentro del contenido). Se busca CUALQUIER elemento cuyo texto
+    // coincida exactamente con el título, sin importar la etiqueta, y
+    // se eliminan TODAS las coincidencias (antes solo se borraba la
+    // primera y podía quedar una segunda repetición sin borrar).
     const normalizar = (t) => (t || '').replace(/\s+/g, ' ').trim();
     const tituloNormalizado = normalizar(title);
     if (tituloNormalizado) {
@@ -157,10 +156,26 @@ export default async function handler(req, res) {
         mainContent.querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b, p, div, span')
       );
       for (const el of candidatosTitulo) {
-        if (normalizar(el.textContent) === tituloNormalizado) {
+        if (el.isConnected && normalizar(el.textContent) === tituloNormalizado) {
           el.remove();
-          break;
         }
+      }
+    }
+
+    // FIX: otra forma en la que el sitio repite el título es como el
+    // COMIENZO de la primera oración del cuerpo (ej: "Obedecer es amar.
+    // Un buen padre..."). Acá no es un elemento repetido para borrar
+    // entero, así que se recorta solo esa frase inicial, dejando el
+    // resto de la oración intacta.
+    if (tituloNormalizado) {
+      const parrafos = Array.from(mainContent.querySelectorAll('p'));
+      const parrafoConTitulo = parrafos.find(p =>
+        normalizar(p.textContent).toLowerCase().startsWith(tituloNormalizado.toLowerCase())
+      );
+      if (parrafoConTitulo) {
+        const escapado = tituloNormalizado.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const patronInicio = new RegExp('^\\s*' + escapado + '\\s*[.:]?\\s*', 'i');
+        parrafoConTitulo.innerHTML = parrafoConTitulo.innerHTML.replace(patronInicio, '');
       }
     }
 
@@ -169,8 +184,28 @@ export default async function handler(req, res) {
     // parte del devocional en sí.
     const bloques = Array.from(mainContent.querySelectorAll('p, div'));
     for (const el of bloques) {
-      if (/lee\s+tambi[eé]n/i.test(el.textContent)) {
+      if (el.isConnected && /lee\s+tambi[eé]n/i.test(el.textContent)) {
         let actual = el;
+        while (actual) {
+          const siguiente = actual.nextElementSibling;
+          actual.remove();
+          actual = siguiente;
+        }
+        break;
+      }
+    }
+
+    // FIX: aislar SOLO el devocional de hoy. Esta página en realidad
+    // muestra 3 devocionales pegados uno atrás del otro ("Palabra de
+    // Hoy", "Palabra de Ayer", "Palabra de Anteayer"), y depender del
+    // texto "Lee también" para cortar no es confiable porque no
+    // siempre aparece. Por eso, además, se corta directamente donde
+    // empieza la sección "Palabra de Ayer" (que sí está siempre
+    // presente), eliminándola junto con todo lo que venga después.
+    const encabezadosRestantes = Array.from(mainContent.querySelectorAll('h1, h2, h3, h4'));
+    for (const h of encabezadosRestantes) {
+      if (h.isConnected && /^Palabra de (Ayer|Anteayer)$/i.test(h.textContent.trim())) {
+        let actual = h;
         while (actual) {
           const siguiente = actual.nextElementSibling;
           actual.remove();
